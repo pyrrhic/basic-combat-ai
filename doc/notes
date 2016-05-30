@@ -1,0 +1,5 @@
+ECS:
+components, just data
+entity, a bag of components
+systems, filters through entities based on which components it has, then presumably does something.
+
