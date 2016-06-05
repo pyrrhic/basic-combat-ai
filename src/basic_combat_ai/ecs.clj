@@ -1,5 +1,7 @@
 (ns basic-combat-ai.ecs)
 
+(def entity-id-counter (atom 0N))
+
 (defn init [game]
   "Returns game map with ecs map added."
     (assoc game :ecs {:entities [], :systems []}))
@@ -20,6 +22,10 @@
                                         ents
                                         (recur (rest syss) ((first syss) (assoc-in game [:ecs :entities] ents)))))))
 
+(defn get-new-id []
+  (swap! entity-id-counter inc)
+  @entity-id-counter)
+
 (defn add-entity [{{ents :entities} :ecs :as game} new-entity]
   "Returns game map with entity added."
-  (assoc-in game [:ecs :entities] (conj ents new-entity)))
+  (assoc-in game [:ecs :entities] (conj ents (assoc new-entity :id (get-new-id)))))
