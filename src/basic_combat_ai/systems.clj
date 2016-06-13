@@ -13,7 +13,7 @@
                   y (float (get-in % [:transform :y]))
                   origin-x (float (get-in % [:transform :origin-x]))
                   origin-y (float (get-in % [:transform :origin-y]))
-                  rotation (float (get-in % [:transform :rotation]))
+                  rotation (* -1 (float (get-in % [:transform :rotation]))) ;libgdx draws rotation counter clock wise, and um, i want to keep my code clock wise because it  makes more sense to me.
                   width (float (.getRegionWidth (:renderable %)))
                   height (float (.getRegionHeight (:renderable %)))]
               (.draw batch texture-region x y origin-x origin-y width height (float 1) (float 1) rotation)) ;the 1's are params scale x and scale y
@@ -67,4 +67,6 @@
        (into modified-ents rest-ents)))
 
 (defn init [game]
-  (ecs/add-system game render))
+  (-> game
+    (ecs/add-system render)
+    (ecs/add-system animate)))

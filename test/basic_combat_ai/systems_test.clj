@@ -1,4 +1,4 @@
-(ns basic-combat-ai.systems_test
+(ns basic-combat-ai.systems-test
   (:require [clojure.test :refer :all]
             [basic-combat-ai.entities :as ent]
             [basic-combat-ai.systems :refer :all]))

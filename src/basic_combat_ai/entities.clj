@@ -2,9 +2,9 @@
   (:require [basic-combat-ai.ecs :as ecs]
             [basic-combat-ai.components :as comps]))
 
-(defn pistoleer [{tex-cache :tex-cache}]
+(defn pistoleer [{tex-cache :tex-cache} x y]
   (assoc {}
-         :transform (comps/transform 50 50 0 16 16)
+         :transform (comps/transform x y 0 16 16)
          :renderable (:pistol-idle tex-cache)
          :animation (comps/animation
                     (comps/frames :pistol-idle (comps/frame (:pistol-idle tex-cache) 0.1) false
@@ -14,4 +14,6 @@
          ))
 
 (defn init [game]
-  (ecs/add-entity game (pistoleer game)))
+  (-> game
+    (ecs/add-entity (pistoleer game 0 0))
+    (ecs/add-entity (pistoleer game 128 128))))

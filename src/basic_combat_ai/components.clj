@@ -27,8 +27,34 @@
  (reduce conj mapped)))
 
 (defn animation [frames]
-  (assoc {}
-         :current-frame -1
-         :current-duration 0.0
-         :current-animation nil
-         :frames frames))
+  {:current-frame -1
+   :current-duration 0.0
+   :current-animation nil
+   :frames frames})
+
+(defn collider
+  "x and y are relative to the transform's x and y. 
+   vertices is a vector, example: [x1 y1 x2 y2 ...]"
+  ([x y width height vertices]
+  {:x x
+   :y y
+   :width width
+   :height height
+   :vertices vertices})
+  ([collider-name x y width height vertices]
+    (assoc (collider x y width height vertices)
+           :name collider-name)))
+
+(defn movement []
+  {:rotation-speed 5})
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
