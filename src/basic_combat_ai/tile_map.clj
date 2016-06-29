@@ -1,13 +1,9 @@
 (ns basic-combat-ai.tile-map)
 
-(def tile-size 32)
-
 (defn- create-tile
   [x y texture]
   {:grid-x x 
    :grid-y y 
-   :x (* x tile-size) 
-   :y (* y tile-size)
    :passable true
    :parent nil
    :move-cost 1
@@ -91,6 +87,14 @@
      (get-sw-neighbor x y grid)
      (get-se-neighbor x y grid))))
 
+(def tile-size 32)
+
+(defn world-coord->grid [n]
+  (/ n tile-size))
+
+(defn grid->world-coord [n]
+  (float (* n tile-size)))
+
 (defn draw-grid [grid batch]
 	(loop [g grid]
 	 (if (= (count g) 0)
@@ -99,8 +103,8 @@
        (.begin batch)
 	     (doall (map 
 	             (fn [tile]
-	              (let [{x :x, y :y, t :texture} tile]
-                 (.draw batch t (float x) (float y))))
+	              (let [{x :grid-x, y :grid-y, t :texture} tile]
+                 (.draw batch t (grid->world-coord x) (grid->world-coord y))))
 	             (first g)))
       (.end batch)
 	     (recur (rest g))))))

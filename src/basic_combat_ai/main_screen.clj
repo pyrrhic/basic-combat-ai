@@ -1,6 +1,6 @@
 (ns basic-combat-ai.main-screen
   (:import [com.badlogic.gdx Screen Gdx InputProcessor Input Input$Keys Input$Buttons]
-           [com.badlogic.gdx.graphics Color Texture GL20] 
+           [com.badlogic.gdx.graphics Color Texture GL20 OrthographicCamera] 
            [com.badlogic.gdx.graphics.g2d SpriteBatch TextureAtlas TextureRegion]
            [java.util Date])
   (:require [basic-combat-ai.ecs :as ecs]
@@ -12,7 +12,8 @@
 
 (defn update-game! [func]
   "Expects a function with 1 parameter which will be the game map. The function must return the updated game map."
-  (alter-var-root (var game) #(func %)))
+  (alter-var-root (var game) #(func %))
+  nil)
 
 (defn clear-screen []
   (doto (Gdx/gl)
@@ -43,25 +44,19 @@
      :fire-pistol01 (.findRegion atlas "fire pistol01")
      :fire-pistol02 (.findRegion atlas "fire pistol02")
      :pistol-idle (.findRegion atlas "pistol idle")
-     :floor (.findRegion atlas "floor")}))
+     :floor (.findRegion atlas "floor")
+     :wall (.findRegion atlas "wall")}))
 
 (defn init-game []
   (let [tex-cache (init-tex-cache)]
     (-> {:batch (SpriteBatch.)
+         :camera (OrthographicCamera. 800 600)
          :tex-cache tex-cache
          :inputs {}
          :tile-map (tile-map/create-grid 25 19 tex-cache)}
       (ecs/init)
       (ent/init)
       (sys/init))))
-
-(defn debug-draw [{{entities :entities} :ecs 
-                   batch :batch 
-                   :as game}]
-  (.begin batch)
-
-  (.end batch)
-  )
 
 (def last-fps 0)
 (def fps 0)
@@ -79,6 +74,7 @@
         (println "frame rate is dropping below 60 : " last-fps " @ " (new java.util.Date)))))
   
   (clear-screen)
+  (.update (:camera game))
   (tile-map/draw-grid (:tile-map game) (:batch game))
   (-> game
     (ecs/update-ecs)))

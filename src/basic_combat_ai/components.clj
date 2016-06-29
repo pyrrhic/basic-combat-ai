@@ -32,21 +32,38 @@
    :current-animation nil
    :frames frames})
 
-(defn collider
-  "x and y are relative to the transform's x and y. 
-   vertices is a vector, example: [x1 y1 x2 y2 ...]"
-  ([x y width height vertices]
+(defn- box-collider
+  "x and y are relative to the transform's x and y."
+  [x y width height]
   {:x x
    :y y
    :width width
-   :height height
-   :vertices vertices})
-  ([collider-name x y width height vertices]
-    (assoc (collider x y width height vertices)
-           :name collider-name)))
+   :height height})
 
-(defn movement []
-  {:rotation-speed 5})
+(defn fov-collider
+  "x and y are relative to the transform's x and y."
+  [x y width height]
+  (box-collider x y width height))
+
+(defn self-collider
+  "x and y are relative to the transform's x and y."
+  [x y width height]
+  (box-collider x y width height))
+
+(defn behavior-tree [root-node]
+  {:tree root-node})
+
+(defn move-to [x-tile y-tile]
+  {:x x-tile
+   :y y-tile})
+
+(defn path [path]
+  {:a-path path
+   :curr-path-idx 0})
+
+(defn movespeed [movespeed rotation-speed]
+  {:movespeed movespeed
+   :rotation-speed rotation-speed})
   
   
   

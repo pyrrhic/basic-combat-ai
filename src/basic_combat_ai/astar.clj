@@ -129,8 +129,10 @@
                    (conj open (calculate-costs neighbor-node origin-node goal-node))
                    closed))))))
 
+;TODO: the start node is being included in the path. do I really want that? I don't think there is a scenario where this is ever useful.
+;      but, maybe there will be, so I'll just leave it in for now.
 (defn extract-path [goal]
-  (loop [path [goal]
+  (loop [path (list goal)
          current (:parent goal)]
     (if (nil? current)
       (map (fn [tile] (dissoc tile :parent :texture :f :g)) path)

@@ -10,8 +10,13 @@
                   :classifier "natives-desktop"]
                  [com.badlogicgames.gdx/gdx-platform "1.8.0"
                   :classifier "natives-desktop"]
+                 [org.clojure/tools.namespace "0.2.11"]
                  [org.clojure/clojure "1.8.0"]
                  ]
   :source-paths ["src"]
   :aot [basic-combat-ai.MyGame]
-  :main basic-combat-ai.desktop-launcher)
+  :main basic-combat-ai.desktop-launcher
+  :jvm-opts ["-Dcom.sun.management.jmxremote"
+           "-Dcom.sun.management.jmxremote.ssl=false"
+           "-Dcom.sun.management.jmxremote.authenticate=false"
+           "-Dcom.sun.management.jmxremote.port=43210"])

@@ -1,23 +1,29 @@
 (ns basic-combat-ai.systems
-  (:import [com.badlogic.gdx.graphics Texture] 
+  (:import [com.badlogic.gdx.graphics Texture OrthographicCamera] 
            [com.badlogic.gdx.graphics.g2d SpriteBatch TextureRegion])
   (:require [basic-combat-ai.ecs :as ecs]
-            [basic-combat-ai.components :as comps]))
+            [basic-combat-ai.components :as comps]
+            [basic-combat-ai.behavior-tree :as bt]))
 
-(defn render [{{ents :entities} :ecs batch :batch}]
+(defn render [{{ents :entities} :ecs batch :batch cam :camera}]
   (let [qualifying-ents (filterv #(and (:renderable %) (:transform %)) ents)]
+    (.setProjectionMatrix batch (.combined cam))
     (.begin batch)
-    (doall 
-      (map #(let [texture-region (:renderable %)
-                  x (float (get-in % [:transform :x]))
-                  y (float (get-in % [:transform :y]))
-                  origin-x (float (get-in % [:transform :origin-x]))
-                  origin-y (float (get-in % [:transform :origin-y]))
-                  rotation (* -1 (float (get-in % [:transform :rotation]))) ;libgdx draws rotation counter clock wise, and um, i want to keep my code clock wise because it  makes more sense to me.
-                  width (float (.getRegionWidth (:renderable %)))
-                  height (float (.getRegionHeight (:renderable %)))]
-              (.draw batch texture-region x y origin-x origin-y width height (float 1) (float 1) rotation)) ;the 1's are params scale x and scale y
-           qualifying-ents))
+    ;this loop isn't really any faster than using map. the slow part is the actual drawing done by libgdx/opengl
+    (loop [q-ents qualifying-ents]
+      (if (empty? q-ents)
+        ents
+        (let [e (first q-ents)
+              texture-region (:renderable e)
+						x (float (get-in e [:transform :x]))
+						y (float (get-in e [:transform :y]))
+						origin-x (float (get-in e [:transform :origin-x]))
+						origin-y (float (get-in e [:transform :origin-y]))
+						rotation (* -1 (float (get-in e [:transform :rotation]))) ;libgdx draws rotation counter clock wise, and um, i want to keep my code clock wise because it  makes more sense to me.
+						  width (float (.getRegionWidth (:renderable e)))
+						height (float (.getRegionHeight (:renderable e)))]
+          (.draw batch texture-region x y origin-x origin-y width height (float 1) (float 1) rotation)
+          (recur (rest q-ents)))))
     (.end batch))
   ents)
 
@@ -66,7 +72,80 @@
            modified-ents (mapv #(animate* % delta) qualifying-ents)]  
        (into modified-ents rest-ents)))
 
+(defn- filter-ents [ents pred]
+  "returns a vector of vectors. the first vector contains entities that satisfied the predicate. the second vector has entities that did not satisfy the predicate."
+  [(filterv pred ents) (filterv #(not (pred %)) ents)])
+
+(defn- get-ent-pos [id ents*]
+     (loop [ents ents*
+            idx 0]
+       (if (= id (:id (first ents)))
+         idx
+         (recur (rest ents) (inc idx)))))
+
+(defn- replace-ent [idx replacement-ent ents]
+     (assoc ents idx replacement-ent))
+
+(defn tick-behavior-tree [{{ents :entities} :ecs :as game}]
+  "ticks the behavior tree once."
+  (let [[qualifying-ents rest-ents] (filter-ents ents #(:behavior-tree %))]
+    (loop [q-ents qualifying-ents
+           all-ents ents]
+      (if (empty? q-ents)
+        all-ents
+        (let [main-ent (first q-ents)
+              tree-root (get-in main-ent [:behavior-tree :tree])
+              ;check if the tree needs to be reset so it can be run again.
+              ready-root (if (or (= :success (:status tree-root))
+                                 (= :failure (:status tree-root)))
+                           (bt/reset-tree tree-root)
+                           tree-root)
+              ;the main-ent's BT will not be accessed. only the node that is passed in explicity.
+              updated-root (bt/update-node ready-root main-ent (assoc-in game [:ecs :entities] all-ents))
+              ;nothing in the nodes will put the BT back into the main-ent, because no node knows if it's the root, so we do it here.
+              ;also this is a function because we don't know if there are any return ents yet.
+              clear-return-ents (fn [root-node] (assoc root-node :return-ents []))
+              get-main-ent (fn [root-node] (first (:return-ents root-node)))
+              update-main-ent-bt (fn [root-node] (assoc-in (get-main-ent root-node) [:behavior-tree :tree] (clear-return-ents root-node)))
+              ]
+          ;for later--
+          ;if root comes back with success or fail, reset the whole tree then go through the tree.
+          ;if root comes back with running, go through the tree as if it were fresh. if land on an action node that is fresh, then need to cancel the old list of running nodes.
+          (if (empty? (:return-ents updated-root))
+            (recur (rest q-ents) (replace-ent
+                                   (get-ent-pos (:id main-ent) all-ents)
+                                   (assoc-in main-ent [:behavior-tree :tree] updated-root)
+                                   all-ents));(bt/update-ents all-ents [(assoc-in main-ent [:behavior-tree :tree] updated-root)]))
+            (recur (rest q-ents) (replace-ent
+                                   (get-ent-pos (:id main-ent) all-ents)
+                                   (update-main-ent-bt updated-root)
+                                   all-ents))
+            
+            ))))));(bt/update-ents all-ents [(update-main-ent-bt updated-root)]))))))))
+
+(defn rotate [{{ents :entities} :ecs}]
+     (let [[qualifying-ents rest-ents] (filter-ents ents #(and (:rotate-by %) 
+                                                               (:movespeed %)
+                                                               (:transform %)))
+           modified-ents (mapv (fn [q-ent]
+                                 (let [rot (:rotation (:transform q-ent))
+                                       rot-by (:rotate-by q-ent)
+                                       rot-speed (:rotation-speed (:movespeed q-ent))]
+                                   ;if the rotation speed is > than the rotation, don't overshoot.
+                                   (if (neg? (- (Math/abs rot-by) rot-speed)) 
+                                     (-> q-ent
+                                       (update-in [:transform :rotation] #(+ % rot-by))
+                                       (dissoc :rotate-by))
+                                     (-> q-ent 
+                                       (update-in [:transform :rotation] #(+ % rot-speed))
+                                       (assoc :rotate-by (if (neg? rot-by) (+ rot-by rot-speed) (- rot-by rot-speed)))))))
+                               qualifying-ents)]
+       (into modified-ents rest-ents)))
+
 (defn init [game]
   (-> game
     (ecs/add-system render)
-    (ecs/add-system animate)))
+    (ecs/add-system animate)
+    (ecs/add-system rotate)
+    (ecs/add-system tick-behavior-tree)
+    ))
