@@ -71,5 +71,3 @@
                                       nil)))) 
                               ents)]
     (vec (remove nil? ents-in-fov-nils))))
-
-;http://members.chello.at/~easyfilter/bresenham.html
