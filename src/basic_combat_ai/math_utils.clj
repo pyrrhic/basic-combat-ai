@@ -53,7 +53,8 @@
             (cond 
               (pos? err) (recur (+ x x-inc) y (dec n) (- err dy2) (conj result [x y]))
               (neg? err) (recur x (+ y y-inc) (dec n) (+ err dx2) (conj result [x y]))
-              :else (recur (+ x x-inc) (+ y y-inc) (- n 2) (- (+ err dx2) dy2) (conj result [x y]))
+              ;when err = 0, the thing i added.
+              :else (recur (+ x x-inc) (+ y y-inc) (- n 2) (- (+ err dx2) dy2) (conj result [x y])) 
               )))))
 
 ;(let [positions (raytrace 0 0 6 2)
