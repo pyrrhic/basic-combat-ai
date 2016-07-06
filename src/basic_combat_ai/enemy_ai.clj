@@ -5,52 +5,84 @@
             [basic-combat-ai.astar :as astar]
             [basic-combat-ai.math-utils :as math-utils]))
 
-(defrecord HasMoveTo [status return-ents]
-  bt/NodeBehavior
-  (bt/reset [node]
-    (assoc node
-           :status :fresh
-           :return-ents []))
-  (bt/run [node main-ent game]
-    (if (:move-to main-ent) (assoc node :status :success) (assoc node :status :failure))))
+(defrecord HasMoveTo [status]
+     bt/NodeBehavior
+     (bt/reset [node]
+       (assoc node :status :fresh))
+     (bt/run [node main-ent-id entities tile-map]
+       (let [main-ent (main-ent-id entities)]
+         (if (:move-to main-ent)
+           (bt/make-return-map (assoc node :status :success) entities tile-map)
+           (bt/make-return-map (assoc node :status :failure) entities tile-map)))))
 
-(defrecord FindPath [status return-ents]
+(defrecord FindPath [status]
+     bt/NodeBehavior
+     (bt/reset [node]
+       (assoc node :status :fresh))
+     (bt/run [node main-ent-id entities curr-tile-map]
+       (let [main-ent (main-ent-id entities)
+             start-tile (tile-map/get-tile (tile-map/world-coord->grid (:x (:transform main-ent)))
+                                           (tile-map/world-coord->grid (:y (:transform main-ent)))
+                                           curr-tile-map)
+             target-tile (tile-map/get-tile (:x (:move-to main-ent)) (:y (:move-to main-ent)) curr-tile-map)
+             path (astar/calc-path start-tile target-tile curr-tile-map)]
+         (if (seq? path)
+           (bt/make-return-map (assoc node :status :success)
+                               (assoc entities main-ent-id (assoc main-ent :path (comps/path path)))
+                               curr-tile-map)
+           (bt/make-return-map (assoc node :status :failure) main-ent curr-tile-map)))))
+
+;(defrecord FollowPath [status]
+;  bt/NodeBehavior
+;  (bt/reset [node] 
+;    (assoc node :status :fresh))
+;  (bt/run [node main-ent-id entities curr-tile-map]
+;    (let [main-ent (main-ent-id entities)
+;          curr-path-idx (get-in main-ent [:path :curr-path-idx])
+;          curr-path (get-in main-ent [:path :a-path])
+;          target-node (nth curr-path curr-path-idx nil)
+;          update-entity #(-> % 
+;                           (assoc-in [:transform :x] (tile-map/grid->world-coord (:grid-x target-node)))
+;                           (assoc-in [:transform :y] (tile-map/grid->world-coord (:grid-y target-node)))
+;                           (assoc-in [:path :curr-path-idx] (inc curr-path-idx)))]
+;      (if (nil? target-node)
+;        (bt/make-return-map (assoc node :status :success) (assoc entities main-ent-id (dissoc main-ent :path)) curr-tile-map)
+;        (bt/make-return-map (assoc node :status :running) (assoc entities main-ent-id (update-entity main-ent)) curr-tile-map)))))
+
+(defrecord FollowPath [status]
   bt/NodeBehavior
-  (bt/reset [node]
-    (assoc node
-           :status :fresh
-           :return-ents []))
-  (bt/run [node main-ent game]
-    (let [start-tile (tile-map/get-tile (tile-map/world-coord->grid  (:x (:transform main-ent))) 
-                                        (tile-map/world-coord->grid  (:y (:transform main-ent)))
-                                        (:tile-map game))
-          target-tile (tile-map/get-tile (:x (:move-to main-ent)) (:y (:move-to main-ent)) (:tile-map game))
-          path (astar/calc-path start-tile target-tile (:tile-map game))]
-      (if (seq? path)
-        (assoc node 
-               :return-ents (conj (:return-ents node) (-> main-ent 
-                                                        (assoc-in [:path] (comps/path path))
-                                                        (dissoc main-ent :move-to)))
-               :status :success)
-        (assoc node :status :failure)))))
-  
-(defrecord FollowPath [status return-ents]
-  bt/NodeBehavior
-  (bt/reset [node]
-    (assoc node
-           :status :fresh
-           :return-ents []))
-  (bt/run [node main-ent game]
-    (let [curr-path-idx (get-in main-ent [:path :curr-path-idx])
+  (bt/reset [node] 
+    (assoc node :status :fresh))
+  (bt/run [node main-ent-id entities curr-tile-map]
+    (let [main-ent (main-ent-id entities)
+          curr-path-idx (get-in main-ent [:path :curr-path-idx])
           curr-path (get-in main-ent [:path :a-path])
-          target-node (nth curr-path curr-path-idx nil)
-          update-entity #(-> % 
-	                         (assoc-in [:transform :x] (tile-map/grid->world-coord (:grid-x target-node)))
-	                         (assoc-in [:transform :y] (tile-map/grid->world-coord (:grid-y target-node)))
-	                         (assoc-in [:path :curr-path-idx] (inc curr-path-idx)))]
+          target-node (nth curr-path curr-path-idx nil)]
       (if (nil? target-node)
-        (assoc node :status :success :return-ents [(dissoc main-ent :path)])
-        (assoc node :return-ents [(update-entity main-ent)])))))
+        (bt/make-return-map (assoc node :status :success) (assoc entities main-ent-id (dissoc main-ent :path)) curr-tile-map)
+        (if (and 
+              (== (:grid-x target-node) (tile-map/world-coord->grid (:x (:transform main-ent))))
+              (== (:grid-y target-node) (tile-map/world-coord->grid (:y (:transform main-ent)))))
+          (bt/make-return-map node (update-in entities [main-ent-id :path :curr-path-idx] #(inc %)) curr-tile-map)
+          (let [ent-target-angle (math-utils/angle-of-unbounded [(:x (:transform main-ent)) (:y (:transform main-ent))] 
+                                                                     [(tile-map/grid->world-coord (:grid-x target-node)) (tile-map/grid->world-coord (:grid-y target-node))])
+                angles-same? (fn [target-rot ent-rot] (if (or (== (Math/abs ent-rot) 180) (zero? (Math/abs ent-rot))) (== target-rot (Math/abs ent-rot)) (== target-rot ent-rot)))]
+            (if (angles-same? ent-target-angle (:rotation (:transform main-ent)))
+              ;walk towards it
+              (bt/make-return-map node
+                                  (update-in entities [main-ent-id :transform] (fn [t] (assoc t 
+                                                                                              :x (tile-map/grid->world-coord (:grid-x target-node))
+                                                                                              :y (tile-map/grid->world-coord (:grid-y target-node)))))
+                                  curr-tile-map)
+              ;create component that will get picked up by a system to make us turn towards it.
+              ;if there is ever a conflict with something else setting the target-rotation within the same frame, there will be overwriting or something. hmm.. not sure how i want to handle this yet.
+              (let [target-rotation-component (if (and (or (== ent-target-angle 0) (== ent-target-angle 180))
+																						           (neg? (:rotation (:transform main-ent))))
+																						    (* -1 ent-target-angle)
+																						    ent-target-angle)]
+                (bt/make-return-map node
+                                    (assoc-in entities [main-ent-id :target-rotation] target-rotation-component)
+                                    curr-tile-map)))))))))
 
 (defn- ents-in-fov [main-ent ents]
   (let [main-e-collider (:fov-collider main-ent)

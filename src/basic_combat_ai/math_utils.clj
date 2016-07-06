@@ -11,13 +11,23 @@
                          20 20])]
     (Intersector/overlapConvexPolygons p1 0 (count p1) p2 0 (count p2) nil)))
 
-(defn angle-of [p1 p2]
+(defn bind-0-360 [angle-degrees]
+  (if (neg? angle-degrees) (+ 360 angle-degrees) angle-degrees))
+
+(defn angle-of [p2 p1]
   (let [delta-y (- (first p1) (first p2))
         delta-x (- (second p1) (second p2))
         angle-radians (Math/atan2 delta-y delta-x)
         angle-degrees (Math/toDegrees angle-radians)
-        bound-0-360 (if (neg? angle-degrees) (+ 360 angle-degrees) angle-degrees)]
+        bound-0-360 (bind-0-360 angle-degrees)]
      bound-0-360))
+
+(defn angle-of-unbounded [p2 p1]
+  (let [delta-y (- (first p1) (first p2))
+        delta-x (- (second p1) (second p2))
+        angle-radians (Math/atan2 delta-y delta-x)
+        angle-degrees (Math/toDegrees angle-radians)]
+     angle-degrees))
 
 (defn rectangle-overlap? [r1 r2]
   "Stole this from the Intersector object in libgdx. Wanted to avoid having to instantiate Rectangle objects

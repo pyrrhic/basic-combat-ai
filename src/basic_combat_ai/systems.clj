@@ -72,75 +72,101 @@
            modified-ents (mapv #(animate* % delta) qualifying-ents)]  
        (into modified-ents rest-ents)))
 
+(defn- ent-vec->map [entities]
+  (loop [ents entities
+         ents-map {}]
+    (if (empty? ents)
+      ents-map
+      (let [e (first ents)]
+        (recur (rest ents) (assoc ents-map (keyword (str (:id e))) e))))))
+
+(defn tick-behavior-tree [{{ents :entities} :ecs tile-map :tile-map :as game}]
+     (let [qualifying-ents (filter #(:behavior-tree %) ents)
+           ents-map (ent-vec->map ents)]
+       (loop [q-ents qualifying-ents ;only use this for the id's. 
+              ents-m ents-map
+              t-map tile-map]
+         (if (empty? q-ents)
+           (vec (vals ents-m))
+           ;only using q-ents for the id's. try to do all other read/write to the ent-map, so I don't get confused later and try updating anything in q-ents.
+           (let [ent-id (keyword (str (:id (first q-ents))))
+                 ;returns {:node (the root) :entities (as map) :tile-map}
+                 tick-data (bt/tick (:tree (:behavior-tree (ent-id ents-m))) ent-id ents-m t-map)
+                 updated-ents-m (:entities tick-data)
+                 updated-ent-with-ticked-node (assoc-in (ent-id updated-ents-m) [:behavior-tree :tree] (:node tick-data))]
+             ;somewhere i need to do a dirty update to the tile map, directly. yay global variables.
+             (recur (rest q-ents) (assoc updated-ents-m ent-id updated-ent-with-ticked-node) (:tile-ap tick-data)))))))
+
+;(defn- get-ent-pos [id ents*]
+;     (loop [ents ents*
+;            idx 0]
+;       (if (= id (:id (first ents)))
+;         idx
+;         (recur (rest ents) (inc idx)))))
+
+;(defn- replace-ent [idx replacement-ent ents]
+;     (assoc ents idx replacement-ent))
+
+;(defn tick-behavior-tree [{{ents :entities} :ecs :as game}]
+;  "ticks the behavior tree once."
+;  (let [[qualifying-ents rest-ents] (filter-ents ents #(:behavior-tree %))]
+;    (loop [q-ents qualifying-ents
+;           all-ents ents]
+;      (if (empty? q-ents)
+;        all-ents
+;        (let [main-ent (first q-ents)
+;              tree-root (get-in main-ent [:behavior-tree :tree])
+;              ;check if the tree needs to be reset so it can be run again.
+;              ready-root (if (or (= :success (:status tree-root))
+;                                 (= :failure (:status tree-root)))
+;                           (bt/reset-tree tree-root)
+;                           tree-root)
+;              ;the main-ent's BT will not be accessed. only the node that is passed in explicity.
+;              updated-root (bt/update-node ready-root main-ent (assoc-in game [:ecs :entities] all-ents))
+;              ;nothing in the nodes will put the BT back into the main-ent, because no node knows if it's the root, so we do it here.
+;              ;also this is a function because we don't know if there are any return ents yet.
+;              clear-return-ents (fn [root-node] (assoc root-node :return-ents []))
+;              get-main-ent (fn [root-node] (first (:return-ents root-node)))
+;              update-main-ent-bt (fn [root-node] (assoc-in (get-main-ent root-node) [:behavior-tree :tree] (clear-return-ents root-node)))
+;              ]
+;          ;for later--
+;          ;if root comes back with success or fail, reset the whole tree then go through the tree.
+;          ;if root comes back with running, go through the tree as if it were fresh. if land on an action node that is fresh, then need to cancel the old list of running nodes.
+;          (if (empty? (:return-ents updated-root))
+;            (recur (rest q-ents) (replace-ent
+;                                   (get-ent-pos (:id main-ent) all-ents)
+;                                   (assoc-in main-ent [:behavior-tree :tree] updated-root)
+;                                   all-ents));(bt/update-ents all-ents [(assoc-in main-ent [:behavior-tree :tree] updated-root)]))
+;            (recur (rest q-ents) (replace-ent
+;                                   (get-ent-pos (:id main-ent) all-ents)
+;                                   (update-main-ent-bt updated-root)
+;                                   all-ents))
+;            
+;            ))))));(bt/update-ents all-ents [(update-main-ent-bt updated-root)]))))))))
+
 (defn- filter-ents [ents pred]
   "returns a vector of vectors. the first vector contains entities that satisfied the predicate. the second vector has entities that did not satisfy the predicate."
   [(filterv pred ents) (filterv #(not (pred %)) ents)])
 
-(defn- get-ent-pos [id ents*]
-     (loop [ents ents*
-            idx 0]
-       (if (= id (:id (first ents)))
-         idx
-         (recur (rest ents) (inc idx)))))
-
-(defn- replace-ent [idx replacement-ent ents]
-     (assoc ents idx replacement-ent))
-
-(defn tick-behavior-tree [{{ents :entities} :ecs :as game}]
-  "ticks the behavior tree once."
-  (let [[qualifying-ents rest-ents] (filter-ents ents #(:behavior-tree %))]
-    (loop [q-ents qualifying-ents
-           all-ents ents]
-      (if (empty? q-ents)
-        all-ents
-        (let [main-ent (first q-ents)
-              tree-root (get-in main-ent [:behavior-tree :tree])
-              ;check if the tree needs to be reset so it can be run again.
-              ready-root (if (or (= :success (:status tree-root))
-                                 (= :failure (:status tree-root)))
-                           (bt/reset-tree tree-root)
-                           tree-root)
-              ;the main-ent's BT will not be accessed. only the node that is passed in explicity.
-              updated-root (bt/update-node ready-root main-ent (assoc-in game [:ecs :entities] all-ents))
-              ;nothing in the nodes will put the BT back into the main-ent, because no node knows if it's the root, so we do it here.
-              ;also this is a function because we don't know if there are any return ents yet.
-              clear-return-ents (fn [root-node] (assoc root-node :return-ents []))
-              get-main-ent (fn [root-node] (first (:return-ents root-node)))
-              update-main-ent-bt (fn [root-node] (assoc-in (get-main-ent root-node) [:behavior-tree :tree] (clear-return-ents root-node)))
-              ]
-          ;for later--
-          ;if root comes back with success or fail, reset the whole tree then go through the tree.
-          ;if root comes back with running, go through the tree as if it were fresh. if land on an action node that is fresh, then need to cancel the old list of running nodes.
-          (if (empty? (:return-ents updated-root))
-            (recur (rest q-ents) (replace-ent
-                                   (get-ent-pos (:id main-ent) all-ents)
-                                   (assoc-in main-ent [:behavior-tree :tree] updated-root)
-                                   all-ents));(bt/update-ents all-ents [(assoc-in main-ent [:behavior-tree :tree] updated-root)]))
-            (recur (rest q-ents) (replace-ent
-                                   (get-ent-pos (:id main-ent) all-ents)
-                                   (update-main-ent-bt updated-root)
-                                   all-ents))
-            
-            ))))));(bt/update-ents all-ents [(update-main-ent-bt updated-root)]))))))))
-
 (defn rotate [{{ents :entities} :ecs}]
-     (let [[qualifying-ents rest-ents] (filter-ents ents #(and (:rotate-by %) 
-                                                               (:movespeed %)
-                                                               (:transform %)))
-           modified-ents (mapv (fn [q-ent]
-                                 (let [rot (:rotation (:transform q-ent))
-                                       rot-by (:rotate-by q-ent)
-                                       rot-speed (:rotation-speed (:movespeed q-ent))]
-                                   ;if the rotation speed is > than the rotation, don't overshoot.
-                                   (if (neg? (- (Math/abs rot-by) rot-speed)) 
-                                     (-> q-ent
-                                       (update-in [:transform :rotation] #(+ % rot-by))
-                                       (dissoc :rotate-by))
-                                     (-> q-ent 
-                                       (update-in [:transform :rotation] #(+ % rot-speed))
-                                       (assoc :rotate-by (if (neg? rot-by) (+ rot-by rot-speed) (- rot-by rot-speed)))))))
-                               qualifying-ents)]
-       (into modified-ents rest-ents)))
+	(let [[qualifying-ents rest-ents] (filter-ents ents #(and (:target-rotation %) 
+	                                                          (:movespeed %)
+	                                                          (:transform %)))
+	      modified-ents (mapv (fn [q-ent]
+	                            (let [rot (:rotation (:transform q-ent))
+															     target-rot (:target-rotation q-ent)
+															     rot-speed (:rotation-speed (:movespeed q-ent))
+															     target-rot-diff-rot-speed (- (Math/abs target-rot) rot-speed)
+															     updated-rotation (if (or (pos? target-rot-diff-rot-speed) 
+															                              (zero? target-rot-diff-rot-speed))
+	                                                     ((if (neg? target-rot) - +) rot rot-speed)
+	                                                     target-rot)
+                                   rotated-ent (assoc-in q-ent [:transform :rotation] updated-rotation)]
+	                              (if (== updated-rotation target-rot)
+                                  (dissoc rotated-ent :target-rotation)
+	                                rotated-ent)))
+	                          qualifying-ents)]
+	  (into modified-ents rest-ents)))
 
 (defn init [game]
   (-> game

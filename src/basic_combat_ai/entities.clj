@@ -14,9 +14,10 @@
                                   :fire-pistol [(comps/frame (:fire-pistol01 tex-cache) 0.05)
                                                 (comps/frame (:fire-pistol02 tex-cache) 0.05)
                                                 (comps/frame (:pistol-idle tex-cache) 0.1)] false))
-         :behavior-tree (comps/behavior-tree (bt/->Selector :fresh [] [(enemy-ai/->HasMoveTo :fresh [])
-																						                          (enemy-ai/->FindPath :fresh [])
-																						                          (enemy-ai/->FollowPath :fresh [])] 0))
+         :behavior-tree (comps/behavior-tree (bt/->Selector :fresh 0 [(enemy-ai/->HasMoveTo :fresh)
+                                                                      (enemy-ai/->FindPath :fresh)
+                                                                      (enemy-ai/->FollowPath :fresh)]))
+         :move-to (comps/move-to 1 1)
          ;this is a box, so that means yes, they have eyes on the back of their heads.
          ;doing this for simpilicity, and i'm not sure that having a cone fov is worth the extra work anyways.
          ;it's not like these guys can be controlled individually, using super advanced tactics or something.
@@ -34,6 +35,6 @@
       
 (defn init [game]
   (-> game
-    (ecs/add-entity (pistoleer game 0 0))
+    ;(ecs/add-entity (pistoleer game 0 0))
     (ecs/add-entity (pistoleer game 64 96))
     ))
