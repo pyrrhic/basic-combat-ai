@@ -7,6 +7,13 @@
   (reset [node] "reset to fresh state. do any clean up necessary.")
   (run [node main-ent-id ents tile-map] "Main node logic. Expected to set the node's status to success or failure."))
 
+(defn reset-behavior-tree [node]
+  (if-not (:children node)
+    (reset node)
+    (-> node
+      (reset)
+      (update :children #(mapv reset-behavior-tree %)))))
+
 (defn make-return-map [node entities tile-map]
   {:node node
    :entities entities

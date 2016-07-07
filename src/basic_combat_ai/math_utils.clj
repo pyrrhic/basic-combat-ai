@@ -11,15 +11,25 @@
                          20 20])]
     (Intersector/overlapConvexPolygons p1 0 (count p1) p2 0 (count p2) nil)))
 
-(defn bind-0-360 [angle-degrees]
-  (if (neg? angle-degrees) (+ 360 angle-degrees) angle-degrees))
+(defn bind-0-359 [angle-degrees]
+  (cond 
+    (neg? angle-degrees) 
+      (+ 360 angle-degrees)
+      
+    (> angle-degrees 359) 
+      (- angle-degrees 360)
+      
+    :else 
+      angle-degrees))
 
 (defn angle-of [p2 p1]
+  ;add check to see if the points are the same. if so, return nil because valid numbers are 0-359.
+  ;and this scenario would generate 0, which isn't correct. 0 means north.
   (let [delta-y (- (first p1) (first p2))
         delta-x (- (second p1) (second p2))
         angle-radians (Math/atan2 delta-y delta-x)
         angle-degrees (Math/toDegrees angle-radians)
-        bound-0-360 (bind-0-360 angle-degrees)]
+        bound-0-360 (bind-0-359 angle-degrees)]
      bound-0-360))
 
 (defn angle-of-unbounded [p2 p1]
