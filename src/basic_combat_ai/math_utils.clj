@@ -1,15 +1,13 @@
 (ns basic-combat-ai.math-utils
   (:import [com.badlogic.gdx.math Intersector]))
 
-;this is a test.
-(defn convex-polygon-intersect? []
-  (let [p1 (float-array [1 1
-                         1 2
-                         2 1])
-        p2 (float-array [0 0
-                         10 10
-                         20 20])]
-    (Intersector/overlapConvexPolygons p1 0 (count p1) p2 0 (count p2) nil)))
+(defn round-to-decimal [number decimal]
+  (if (instance? Long number)
+    number
+    (let [formatted (format (str "%." decimal "f") number)]
+      (if (instance? String formatted)
+        (Double/parseDouble formatted)
+        formatted))))
 
 (defn bind-0-359 [angle-degrees]
   (cond 

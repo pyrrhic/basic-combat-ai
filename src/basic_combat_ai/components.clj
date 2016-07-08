@@ -65,7 +65,8 @@
   {:movespeed movespeed
    :rotation-speed rotation-speed})
 
-;rotate-by
+;target-rotation
+;target-location
   
   
   

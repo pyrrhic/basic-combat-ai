@@ -4,7 +4,8 @@
   (:require [basic-combat-ai.ecs :as ecs]
             [basic-combat-ai.components :as comps]
             [basic-combat-ai.behavior-tree :as bt]
-            [basic-combat-ai.math-utils :as math-utils]))
+            [basic-combat-ai.math-utils :as math-utils]
+            [basic-combat-ai.tile-map :as tile-map]))
 
 (defn render [{{ents :entities} :ecs batch :batch cam :camera}]
   (let [qualifying-ents (filterv #(and (:renderable %) (:transform %)) ents)]
@@ -126,38 +127,51 @@
                                                         raw-rotation-left
                                                         rot-speed)
                                    rotation-direction (if (neg? raw-rotation-left) - +)
-															     updated-rotation (math-utils/bind-0-359 (rotation-direction rot rotation-increment))
+															     updated-rotation (-> (rotation-direction rot rotation-increment)
+                                                      (math-utils/bind-0-359)
+                                                      (math-utils/round-to-decimal 1))
                                    rotated-ent (assoc-in q-ent [:transform :rotation] updated-rotation)]
-	                              (if (== updated-rotation target-rot)
-                                  (dissoc rotated-ent :target-rotation)
-	                                rotated-ent)))
+	                             (if  (== target-rot updated-rotation)
+                                (dissoc rotated-ent :target-rotation)
+                                rotated-ent)))
 	                          qualifying-ents)]
 	  (into modified-ents rest-ents)))
 
-;(defn rotate [{{ents :entities} :ecs}]
-;	(let [[qualifying-ents rest-ents] (filter-ents ents #(and (:target-rotation %) 
-;	                                                          (:movespeed %)
-;	                                                          (:transform %)))
-;	      modified-ents (mapv (fn [q-ent]
-;	                            (let [rot (:rotation (:transform q-ent))
-;															     target-rot (:target-rotation q-ent)
-;															     rot-speed (:rotation-speed (:movespeed q-ent))
-;															     target-rot-diff-rot-speed (- (Math/abs target-rot) rot-speed)
-;															     updated-rotation (if (or (pos? target-rot-diff-rot-speed) 
-;															                              (zero? target-rot-diff-rot-speed))
-;	                                                     ((if (neg? target-rot) - +) rot rot-speed)
-;	                                                     target-rot)
-;                                   rotated-ent (assoc-in q-ent [:transform :rotation] updated-rotation)]
-;	                              (if (== updated-rotation target-rot)
-;                                  (dissoc rotated-ent :target-rotation)
-;	                                rotated-ent)))
-;	                          qualifying-ents)]
-;	  (into modified-ents rest-ents)))
+(defn move [{{ents :entities} :ecs}]
+  (let [[qualifying-ents rest-ents] (filter-ents ents #(and (:target-location %) (:movespeed %) (:transform %)))
+        degrees->vector (fn [rotation]
+                          (let [x (math-utils/round-to-decimal (Math/sin (Math/toRadians rotation)) 1)
+                                y (math-utils/round-to-decimal (Math/cos (Math/toRadians rotation)) 1)]
+                            [x y]))
+        update-ent (fn [e]
+                     (let [dir-vec (degrees->vector (:rotation (:transform e)))
+                           x-speed (* (nth dir-vec 0) (:movespeed (:movespeed e)))
+                           y-speed (* (nth dir-vec 1) (:movespeed (:movespeed e)))
+                           tar-loc-x (tile-map/grid->world-coord (:x (:target-location e)))
+                           x-inc (if (< (Math/abs (- tar-loc-x (:x (:transform e)))) (Math/abs x-speed))
+                                   (- tar-loc-x (:x (:transform e)))
+                                   x-speed)
+                           tar-loc-y (tile-map/grid->world-coord (:y (:target-location e)))
+                           y-inc (if (< (Math/abs (- tar-loc-y (:y (:transform e)))) (Math/abs y-speed))
+                                   (- tar-loc-y (:y (:transform e)))
+                                   y-speed)]
+;                           x-inc-dir (if (> tar-loc-x (:x (:transform e))) + -)
+;                           y-inc-dir (if (> (tile-map/grid->world-coord (:y (:target-location e))) (:y (:transform e))) + -)]
+                       ;if the x and y transforms are equal to the x and y in the target location, then remove the target-location component from the entity and return it.
+                       ;else, apply the x increment and the y increment to the transform and return the entity.
+                       (if (and (== tar-loc-x (:x (:transform e))) (== tar-loc-y (:y (:transform e))))
+                         (dissoc e :target-location)
+                         (-> e
+                           (update-in [:transform :x] (fn [x] (math-utils/round-to-decimal (+ x x-inc) 1)))
+                           (update-in [:transform :y] (fn [y] (math-utils/round-to-decimal (+ y y-inc) 1)))))))
+        modified-ents (mapv update-ent qualifying-ents)]
+    (into modified-ents rest-ents)))
 
 (defn init [game]
   (-> game
     (ecs/add-system render)
     (ecs/add-system animate)
     (ecs/add-system rotate)
+    (ecs/add-system move)
     (ecs/add-system tick-behavior-tree)
     ))
