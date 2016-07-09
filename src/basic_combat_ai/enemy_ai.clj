@@ -79,8 +79,8 @@
                  (== (:grid-x target-node) (tile-map/world-coord->grid (:x (:transform main-ent))))
                  (== (:grid-y target-node) (tile-map/world-coord->grid (:y (:transform main-ent)))))
              (bt/make-return-map node (update-in entities [main-ent-id :path :curr-path-idx] #(inc %)) curr-tile-map)
-             (let [ent-target-angle (math-utils/angle-of [(:x (:transform main-ent)) (:y (:transform main-ent))] 
-                                                         [(tile-map/grid->world-coord (:grid-x target-node)) (tile-map/grid->world-coord (:grid-y target-node))])]
+             (let [ent-target-angle (math-utils/round-to-decimal (math-utils/angle-of [(:x (:transform main-ent)) (:y (:transform main-ent))] 
+                                                                                      [(tile-map/grid->world-coord (:grid-x target-node)) (tile-map/grid->world-coord (:grid-y target-node))]) 1)]
                (if (== ent-target-angle (:rotation (:transform main-ent)))
                  ;walk towards it
                  (if (:target-location main-ent)
