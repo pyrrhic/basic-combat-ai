@@ -53,13 +53,13 @@
                                  {:entity e :have-los? (los? main-ent e curr-tile-map)})
                              (vals (dissoc entities main-ent-id)))
           ents-los-true (filter #(:have-los? %) ents-los-checked)
-          calc-distance (fn [e-los] 
-                          (let [{x1 :x, y1 :y} (:transform (:entity e-los))
+          calc-distance (fn [e] 
+                          (let [{x1 :x, y1 :y} (:transform e)
                                 {x0 :x, y0 :y} (:transform main-ent)]
                             (+ (Math/abs (- x1 x0)) (Math/abs (- y1 y0)))))           
           closest-ent (loop [e-los (rest ents-los-true)
                              closest-ent (:entity (first ents-los-true))]
-                        (if (empty e-los)
+                        (if (empty? e-los)
                           closest-ent
                           (recur (rest e-los)
                                  (if (< (calc-distance (:entity (first e-los))) (calc-distance closest-ent))
@@ -123,25 +123,34 @@
                                  curr-tile-map))))))
 
 (defrecord FindPath [status]
-     bt/NodeBehavior
-     (bt/reset [node]
-       (assoc node :status :fresh))
-     (bt/run [node main-ent-id entities curr-tile-map]
-       (let [main-ent (main-ent-id entities)
-             start-tile (tile-map/get-tile (tile-map/world-coord->grid (:x (:transform main-ent)))
-                                           (tile-map/world-coord->grid (:y (:transform main-ent)))
-                                           curr-tile-map)
-             target-tile (tile-map/get-tile (:x (:move-to main-ent)) (:y (:move-to main-ent)) curr-tile-map)
-             path (astar/calc-path start-tile target-tile curr-tile-map)]
-         (if (seq? path)
-           (bt/make-return-map (assoc node :status :success)
-                               (assoc entities main-ent-id (-> main-ent 
-                                                             (assoc :path (comps/path path))
-                                                             (dissoc :move-to)))
-                               curr-tile-map)
-           (bt/make-return-map (assoc node :status :failure) main-ent curr-tile-map)))))
+  bt/NodeCancel
+  (bt/cancel [node main-ent-id entities curr-tile-map]
+    (bt/make-return-map (assoc node :status :failure)
+                        (update entities main-ent-id (fn [old-ent] (dissoc old-ent :path)))))
+  
+  bt/NodeBehavior
+  (bt/reset [node]
+    (assoc node :status :fresh))
+  (bt/run [node main-ent-id entities curr-tile-map]
+    (let [main-ent (main-ent-id entities)
+          start-tile (tile-map/get-tile (tile-map/world-coord->grid (:x (:transform main-ent)))
+                                        (tile-map/world-coord->grid (:y (:transform main-ent)))
+                                        curr-tile-map)
+          target-tile (tile-map/get-tile (:x (:move-to main-ent)) (:y (:move-to main-ent)) curr-tile-map)
+          path (astar/calc-path start-tile target-tile curr-tile-map)]
+      (if (seq? path)
+        (bt/make-return-map (assoc node :status :success)
+                            (assoc entities main-ent-id (-> main-ent 
+                                                          (assoc :path (comps/path path))
+                                                          (dissoc :move-to)))
+                            curr-tile-map)
+        (bt/make-return-map (assoc node :status :failure) main-ent curr-tile-map)))))
 
 (defrecord PickRandomTile [status]
+  bt/NodeCancel
+  (bt/cancel [node main-ent-id entities curr-tile-map]
+    (bt/make-return-map (assoc node :status :failure)
+                        (update entities main-ent-id (fn [old-ent] (dissoc old-ent :move-to)))))
   bt/NodeBehavior
   (bt/reset [node]
        (assoc node :status :fresh))
@@ -150,7 +159,9 @@
           y-max 8
           x (rand-int x-max)
           y (rand-int y-max)]
-      (bt/make-return-map (assoc node :status :success) (assoc-in entities [main-ent-id :move-to] (comps/move-to x y)) curr-tile-map))))
+      (bt/make-return-map (assoc node :status :success) 
+                          (assoc-in entities [main-ent-id :move-to] (comps/move-to x y)) 
+                          curr-tile-map))))
 
 (defrecord FollowPath [status]
      bt/NodeBehavior
