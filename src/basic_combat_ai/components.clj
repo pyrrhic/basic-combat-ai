@@ -68,7 +68,19 @@
 ;target-rotation
 ;target-location
   
-  
+(defn hit-points [ent hp]
+  (assoc ent :hit-points hp)) 
+
+(defn projectile-weapon [ent & {:keys [cooldown curr-cooldown damage max-ammo current-ammo reload-speed]}]
+     (assoc ent
+            :projectile-weapon {:cooldown cooldown
+                                :curr-cooldown curr-cooldown
+                                :damage damage
+                                :max-ammo max-ammo
+                                :current-ammo current-ammo
+                                :reload-speed reload-speed}))
+
+
   
   
   

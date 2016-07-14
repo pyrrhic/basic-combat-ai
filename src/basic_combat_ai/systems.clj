@@ -98,11 +98,21 @@
                                     (= :failure (:status unchecked-bt)))
                               (bt/reset-behavior-tree unchecked-bt)
                               unchecked-bt)
-                 tick-data (bt/tick checked-bt ent-id ents-m t-map)
+                 tick-data (if (= (:status checked-bt) :running)
+                             (let [id-existing (bt/get-id-of-running-composite checked-bt)
+                                   canceled-tick-data  (let [canceled-return-data (bt/cancel-running-leaf checked-bt ent-id ents-m t-map)
+                                                             reseted-tree (bt/reset-behavior-tree checked-bt)]
+                                                        (bt/tick reseted-tree ent-id (:entities canceled-return-data) (:tile-map canceled-return-data)))
+                                   id-canceled (bt/get-id-of-running-composite (:node canceled-tick-data))]
+                               (if (= id-existing id-canceled)
+                                 (bt/tick checked-bt ent-id ents-m t-map)
+                                 canceled-tick-data))
+                             ;status is fresh
+                             (bt/tick checked-bt ent-id ents-m t-map))
                  updated-ents-m (:entities tick-data)
                  updated-ent-with-ticked-node (assoc-in (ent-id updated-ents-m) [:behavior-tree :tree] (:node tick-data))]
              ;somewhere i need to do a dirty update to the tile map, directly. yay global variables.
-             (recur (rest q-ents) (assoc updated-ents-m ent-id updated-ent-with-ticked-node) (:tile-ap tick-data)))))))
+             (recur (rest q-ents) (assoc updated-ents-m ent-id updated-ent-with-ticked-node) (:tile-map tick-data)))))))
 
 (defn- filter-ents [ents pred]
   "returns a vector of vectors. the first vector contains entities that satisfied the predicate. the second vector has entities that did not satisfy the predicate."
@@ -123,11 +133,10 @@
                                                          (- angle-diff 360))
                                                        angle-diff)
                                    ;'overflow' check
-                                   rotation-increment (if (<= (Math/abs (- raw-rotation-left rot-speed)) 0)
+                                   rotation-increment (if (<= (Math/abs raw-rotation-left) rot-speed)
                                                         raw-rotation-left
-                                                        rot-speed)
-                                   rotation-direction (if (neg? raw-rotation-left) - +)
-															     updated-rotation (-> (rotation-direction rot rotation-increment)
+                                                        (* (if (neg? raw-rotation-left) -1 1) rot-speed))
+															     updated-rotation (-> (+ rot rotation-increment)
                                                       (math-utils/bind-0-359)
                                                       (math-utils/round-to-decimal 1))
                                    rotated-ent (assoc-in q-ent [:transform :rotation] updated-rotation)]
@@ -155,8 +164,6 @@
                            y-inc (if (< (Math/abs (- tar-loc-y (:y (:transform e)))) (Math/abs y-speed))
                                    (- tar-loc-y (:y (:transform e)))
                                    y-speed)]
-;                           x-inc-dir (if (> tar-loc-x (:x (:transform e))) + -)
-;                           y-inc-dir (if (> (tile-map/grid->world-coord (:y (:target-location e))) (:y (:transform e))) + -)]
                        ;if the x and y transforms are equal to the x and y in the target location, then remove the target-location component from the entity and return it.
                        ;else, apply the x increment and the y increment to the transform and return the entity.
                        (if (and (== tar-loc-x (:x (:transform e))) (== tar-loc-y (:y (:transform e))))
@@ -167,11 +174,37 @@
         modified-ents (mapv update-ent qualifying-ents)]
     (into modified-ents rest-ents)))
 
+(defn death [{{ents :entities} :ecs}]
+  (let [[qualifying-ents rest-ents] (filter-ents ents #(:hit-points %))
+        die? (fn [e]
+               (if (<= (:hit-points e) 0)
+                 true
+                 false))]
+    (loop [q-ents qualifying-ents
+           ents-map (ent-vec->map ents)]
+      (if (empty? q-ents)
+        (into rest-ents (vals ents-map))
+        (recur 
+          (rest q-ents)
+          (let [e (first q-ents)]
+            (if (die? e) (dissoc ents-map (keyword (str (:id e)))) ents-map)))))))
+
+(defn projectile-weapon-cooldown [{{ents :entities} :ecs delta :delta}]
+  (let [[qualifying-ents rest-ents] (filter-ents ents #(:projectile-weapon %))
+        tick-cooldown (fn [e]
+                        (if (pos? (:curr-cooldown (:projectile-weapon e)))
+                          (update-in e [:projectile-weapon :curr-cooldown] (fn [ccd] (math-utils/round-to-decimal (- ccd delta) 3)))
+                          e))
+        modified-ents (map tick-cooldown qualifying-ents)]
+    (into rest-ents modified-ents)))
+
 (defn init [game]
   (-> game
     (ecs/add-system render)
+    (ecs/add-system tick-behavior-tree)
     (ecs/add-system animate)
     (ecs/add-system rotate)
     (ecs/add-system move)
-    (ecs/add-system tick-behavior-tree)
+    (ecs/add-system death)
+    (ecs/add-system projectile-weapon-cooldown)
     ))

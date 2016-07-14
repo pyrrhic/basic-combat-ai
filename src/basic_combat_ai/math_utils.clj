@@ -23,6 +23,7 @@
 (defn angle-of [p2 p1]
   ;add check to see if the points are the same. if so, return nil because valid numbers are 0-359.
   ;and this scenario would generate 0, which isn't correct. 0 means north.
+  "returns angle 0-359 degrees"
   (let [delta-y (- (first p1) (first p2))
         delta-x (- (second p1) (second p2))
         angle-radians (Math/atan2 delta-y delta-x)
@@ -49,31 +50,31 @@
       (> (+ y1 height1) y2))))
 
 (defn raytrace [x0 y0 x1 y1]
-      "http://playtechs.blogspot.com/2007/03/raytracing-on-grid.html 
-      Took the algorithm at the bottom, the all integer version. It looks like the Bresenham algorithm.
-      I modified it slightly to include the scenario when error is 0, which means the line is exactly inbetween tiles.
-      Basically the tile for that loop gets skipped, instead of the defaulting to the horizontal tile like the original algorithm.
-      My modification makes this ray sorta mimick entity movement.
-      Returns something like this [[x y] [x y] [x y]]. It's in order, based on the input."
-      (let [dx (Math/abs (- x1 x0))
-            dy (Math/abs (- y1 y0))
-            x-inc (if (> x1 x0) 1 -1)
-            y-inc (if (> y1 y0) 1 -1)
-            dx2 (* dx 2)
-            dy2 (* dy 2)]
-        (loop [x x0
-               y y0
-               n (+ 1 dx dy)
-               err (- dx dy) 
-               result []]
-          (if (<= n 0)
-            result
-            (cond 
-              (pos? err) (recur (+ x x-inc) y (dec n) (- err dy2) (conj result [x y]))
-              (neg? err) (recur x (+ y y-inc) (dec n) (+ err dx2) (conj result [x y]))
-              ;when err = 0, the thing i added.
-              :else (recur (+ x x-inc) (+ y y-inc) (- n 2) (- (+ err dx2) dy2) (conj result [x y])) 
-              )))))
+	"http://playtechs.blogspot.com/2007/03/raytracing-on-grid.html 
+	Took the algorithm at the bottom, the all integer version. It looks like the Bresenham algorithm.
+	I modified it slightly to include the scenario when error is 0, which means the line is exactly inbetween tiles.
+	Basically the tile for that loop gets skipped, instead of the defaulting to the horizontal tile like the original algorithm.
+	My modification makes this ray sorta mimick entity movement.
+	Returns something like this [[x y] [x y] [x y]]. It's in order, based on the input."
+	(let [dx (Math/abs (- x1 x0))
+	      dy (Math/abs (- y1 y0))
+	      x-inc (if (> x1 x0) 1 -1)
+	      y-inc (if (> y1 y0) 1 -1)
+	      dx2 (* dx 2)
+	      dy2 (* dy 2)]
+	  (loop [x x0
+	         y y0
+	         n (+ 1 dx dy)
+	         err (- dx dy) 
+	         result []]
+	    (if (<= n 0)
+	      result
+	      (cond 
+	        (pos? err) (recur (+ x x-inc) y (dec n) (- err dy2) (conj result [x y]))
+	        (neg? err) (recur x (+ y y-inc) (dec n) (+ err dx2) (conj result [x y]))
+	        ;when err = 0, the thing i added.
+	        :else (recur (+ x x-inc) (+ y y-inc) (- n 2) (- (+ err dx2) dy2) (conj result [x y])) 
+	        )))))
 
 ;(let [positions (raytrace 0 0 6 2)
 ;      wall-texture (:wall (:tex-cache ms/game))

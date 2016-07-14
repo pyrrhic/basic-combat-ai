@@ -73,11 +73,13 @@
       (when (< last-fps 60)
         (println "frame rate is dropping below 60 : " last-fps " @ " (new java.util.Date)))))
   
-  (clear-screen)
-  (.update (:camera game))
-  (tile-map/draw-grid (:tile-map game) (:batch game))
-  (-> game
-    (ecs/update-ecs)))
+  (if (:paused game)
+    game
+    (do (clear-screen)
+      (.update (:camera game))
+      (tile-map/draw-grid (:tile-map game) (:batch game))
+      (-> game
+        (ecs/update-ecs)))))
 
 (defn screen []
   (reify Screen
