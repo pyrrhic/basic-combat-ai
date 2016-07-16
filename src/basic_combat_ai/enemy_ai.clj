@@ -1,5 +1,7 @@
 (ns basic-combat-ai.enemy-ai
   (:require [basic-combat-ai.components :as comps]
+            [basic-combat-ai.ecs :as ecs]
+            [basic-combat-ai.projectile :as projectile]
             [basic-combat-ai.behavior-tree :as bt]
             [basic-combat-ai.tile-map :as tile-map]
             [basic-combat-ai.astar :as astar]
@@ -16,18 +18,7 @@
            (bt/make-return-map (assoc node :status :success) entities tile-map)
            (bt/make-return-map (assoc node :status :failure) entities tile-map)))))
 
-;(defrecord HasPath [status]
-;  bt/NodeBehavior
-;  (bt/reset [node]
-;    (assoc node :status :fresh))
-;  (bt/run [node main-ent-id entities curr-tile-map]
-;    (if (:path (main-ent-id entities))
-;      (bt/make-return-map (assoc node :status :success) entities curr-tile-map)
-;      (bt/make-return-map (assoc node :status :failure) entities curr-tile-map))))
-
 ;Commands
-
-;LOS check
 (defn- los? [ent1 ent2 curr-tile-map] 
   (let [grid-x1 (tile-map/world-coord->grid (:x (:transform ent1)))
         grid-y1 (tile-map/world-coord->grid (:y (:transform ent1)))
@@ -48,21 +39,21 @@
        (assoc node :status :fresh))
   (bt/run [node main-ent-id entities curr-tile-map]
     (let [main-ent (main-ent-id entities)
+          ents-with-hp (into {} (filter (fn [e] (:hit-points (second e))) entities)) 
           ents-los-checked (map 
                              (fn [e] 
                                  {:entity e :have-los? (los? main-ent e curr-tile-map)})
-                             (vals (dissoc entities main-ent-id)))
+                             (vals (dissoc ents-with-hp main-ent-id)))
           ents-los-true (filter #(:have-los? %) ents-los-checked)
-          calc-distance (fn [e] 
-                          (let [{x1 :x, y1 :y} (:transform e)
-                                {x0 :x, y0 :y} (:transform main-ent)]
-                            (+ (Math/abs (- x1 x0)) (Math/abs (- y1 y0)))))           
           closest-ent (loop [e-los (rest ents-los-true)
                              closest-ent (:entity (first ents-los-true))]
                         (if (empty? e-los)
                           closest-ent
                           (recur (rest e-los)
-                                 (if (< (calc-distance (:entity (first e-los))) (calc-distance closest-ent))
+                                 (if (< (math-utils/distance (:entity (first e-los))
+                                                             main-ent) 
+                                        (math-utils/distance closest-ent
+                                                             main-ent))
                                    (:entity (first e-los))
                                    closest-ent))))]
       (if (:id closest-ent)
@@ -79,18 +70,47 @@
     true
     false))
 
+(defn- fired-weapon [ent]
+  (-> ent
+    (assoc-in [:animation :current-animation] :fire-pistol)
+    (assoc-in [:projectile-weapon :curr-cooldown] (get-in ent [:projectile-weapon :cooldown]))
+    (dissoc :combat-target-id)))
+
+(defn- pending-tracer-added [entities main-ent]
+  (let [main-ent-transform (:transform main-ent)
+        tracer-id (keyword (str (ecs/get-new-id)))
+        tracer-x (+ (:x main-ent-transform) (:origin-x main-ent-transform))
+        tracer-y (+ (:y main-ent-transform) (:origin-y main-ent-transform))
+        combat-target-transform (:transform ((:combat-target-id main-ent) entities))
+        combat-target-x (+ (:x combat-target-transform) (:origin-x combat-target-transform))
+        combat-target-y (+ (:y combat-target-transform) (:origin-y combat-target-transform))
+        scale-y (/ (math-utils/euclidean-distance tracer-x tracer-y
+                                                  combat-target-x combat-target-y)
+                 7)]
+    (assoc entities 
+           tracer-id (projectile/pending-entity 
+                       #(projectile/tracer % 
+                                           tracer-id 
+                                           tracer-x
+                                           tracer-y
+                                           1 ;scale-x
+                                           scale-y 
+                                           (:rotation main-ent-transform))))))
+
+(defn- combat-target-damaged [entities main-ent]
+  (update-in entities [(:combat-target-id main-ent) :hit-points] (fn [hp] 
+                                                                   (- hp (:damage (:projectile-weapon main-ent))))))
+  
 (defn- fire-weapon [main-ent-id entities]
   "Returns the full map of entities with the main entity and the target entity updated as a result of firing the main ent's weapon.
    Does not tick the cooldown for the weapon. Expecting a system to handle it because it will always tick every update."
   (if (can-fire? (main-ent-id entities))
     (let [main-ent (main-ent-id entities)
-          updated-main-ent (-> main-ent
-                             (assoc-in [:animation :current-animation] :fire-pistol)
-                             (assoc-in [:projectile-weapon :curr-cooldown] (get-in main-ent [:projectile-weapon :cooldown]))
-                             (dissoc :combat-target-id))
+          updated-main-ent (fired-weapon main-ent)
           updated-entities (-> entities
                              (assoc main-ent-id updated-main-ent)
-                             (update-in [(:combat-target-id main-ent) :hit-points] (fn [hp] (- hp (:damage (:projectile-weapon main-ent))))))]
+                             (combat-target-damaged main-ent)
+                             (pending-tracer-added main-ent))]
       updated-entities)
     entities))
 

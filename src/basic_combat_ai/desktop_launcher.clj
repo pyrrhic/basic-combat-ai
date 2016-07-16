@@ -48,4 +48,4 @@
     (set! (.title config) "hey you")
     (LwjglApplication. create-game/game config)))
 
-;(app)
+(app)

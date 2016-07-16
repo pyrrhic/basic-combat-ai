@@ -80,9 +80,20 @@
                                 :current-ammo current-ammo
                                 :reload-speed reload-speed}))
 
+(defn renderable 
+  ([ent texture]
+    (renderable ent texture 1 1))
+  ([ent texture scale-x scale-y]
+    (assoc ent 
+           :renderable {:texture texture
+                        :scale-x scale-x
+                        :scale-y scale-y})))
 
+(defn timed-life [ent life-in-seconds]
+  (assoc ent
+         :timed-life life-in-seconds))
   
-  
+ 
   
   
   

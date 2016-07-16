@@ -1,8 +1,7 @@
 (ns basic-combat-ai.entities
   (:require [basic-combat-ai.ecs :as ecs]
             [basic-combat-ai.components :as comps]
-            [basic-combat-ai.behavior-tree :as bt]
-            [basic-combat-ai.enemy-ai :as enemy-ai]))
+            [basic-combat-ai.enemy-ai-tree :as enemy-ai-tree]))
 
 (defn pistoleer [{tex-cache :tex-cache} x y]
   "x and y need to be in terms of world coordinates. stop fucking putting in grid coords, chris.
@@ -15,26 +14,16 @@ although you should definately make it grid coords, because putting in world coo
                              :max-ammo 9 
                              :current-ammo 9 
                              :reload-speed 5)
+    (comps/renderable (:pistol-idle tex-cache))
     (assoc 
       :transform (comps/transform x y 0 16 16)
       :movespeed (comps/movespeed 2 8)
-      :renderable (:pistol-idle tex-cache)
       :animation (comps/animation
                    (comps/frames :pistol-idle (comps/frame (:pistol-idle tex-cache) 0.1) false
                                  :fire-pistol [(comps/frame (:fire-pistol01 tex-cache) 0.05)
                                                (comps/frame (:fire-pistol02 tex-cache) 0.05)
                                                (comps/frame (:pistol-idle tex-cache) 0.1)] false))
-      :behavior-tree (->  
-                       (comps/behavior-tree 
-                         (bt/->Selector :fresh 0 
-                                        [(bt/->Sequence :fresh 0
-                                                        [(enemy-ai/->LocateACombatTarget :fresh)
-                                                         (enemy-ai/->EngageCombatTarget :fresh)])
-                                         (bt/->Sequence :fresh 0 
-                                                        [(enemy-ai/->PickRandomTile :fresh)
-                                                         (enemy-ai/->FindPath :fresh)
-                                                         (enemy-ai/->FollowPath :fresh)])]))
-                       (update :tree #(bt/add-ids-to-tree %)))
+      :behavior-tree (comps/behavior-tree (enemy-ai-tree/basic-ai))
       
       ;this is a box, so that means yes, they have eyes on the back of their heads.
         ;doing this for simpilicity, and i'm not sure that having a cone fov is worth the extra work anyways.
@@ -43,6 +32,7 @@ although you should definately make it grid coords, because putting in world coo
         :self-collider (comps/self-collider 0 0 32 32)
       )))
 
+; (require '[basic-combat-ai.main-screen :as ms])
 ;(do 
 ;  (ms/update-game! #(ecs/add-entity % (pistoleer % 0 0)))
 ;  (ms/update-game! #(ecs/add-entity % (pistoleer % 32 0)))
@@ -52,7 +42,6 @@ although you should definately make it grid coords, because putting in world coo
       
 (defn init [game]
   (-> game
-    (ecs/add-entity (pistoleer game 0 0))
     (ecs/add-entity (pistoleer game 32 32))
-    (ecs/add-entity (pistoleer game 64 96))
+    (ecs/add-entity (pistoleer game 128 128))
     ))

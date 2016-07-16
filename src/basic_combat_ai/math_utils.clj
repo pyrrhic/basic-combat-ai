@@ -32,6 +32,7 @@
      bound-0-360))
 
 (defn angle-of-unbounded [p2 p1]
+  "returns degrees, 0 to 180 and 0 to -180"
   (let [delta-y (- (first p1) (first p2))
         delta-x (- (second p1) (second p2))
         angle-radians (Math/atan2 delta-y delta-x)
@@ -76,20 +77,20 @@
 	        :else (recur (+ x x-inc) (+ y y-inc) (- n 2) (- (+ err dx2) dy2) (conj result [x y])) 
 	        )))))
 
-;(let [positions (raytrace 0 0 6 2)
-;      wall-texture (:wall (:tex-cache ms/game))
-;      floor-texture (:floor (:tex-cache ms/game))
-;      update-tile (fn [x y] (assoc-in (:tile-map ms/game) [x y :texture] wall-texture))]
-;  (loop [posis positions]
-;    (if (empty? posis)
-;      nil
-;      (do
-;        (let [tile-pos (nth posis 0)
-;              x (nth tile-pos 0)
-;              y (nth tile-pos 1)]
-;        (ms/update-game! #(assoc % :tile-map (update-tile x y)))
-;        (recur (rest posis)))))))
+(defn distance 
+  "manhattan distance"
+  ([e1 e2] 
+    (let [{x1 :x, y1 :y} (:transform e1)
+          {x0 :x, y0 :y} (:transform e2)]
+      (distance x0 y0 x1 y1)))
+  ([x0 y0 x1 y1] ;this one is not used. so uh, feel free to refactor this. when you arn't lazy.
+    (+ (Math/abs (- x1 x0)) (Math/abs (- y1 y0)))))
 
+(defn euclidean-distance [x0 y0 x1 y1]
+  (Math/sqrt 
+    (+ (Math/pow (- x1 x0) 2)
+       (Math/pow (- y1 y0) 2))))
+  
 ;rotate p2 around center
 ;newX = centerX + ( cosX * (point2X-centerX) + sinX * (point2Y -centerY))
 ;newY = centerY + ( -sinX * (point2X-centerX) + cosX * (point2Y -centerY))

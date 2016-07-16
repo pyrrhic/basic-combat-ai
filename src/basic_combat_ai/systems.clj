@@ -3,6 +3,7 @@
            [com.badlogic.gdx.graphics.g2d SpriteBatch TextureRegion])
   (:require [basic-combat-ai.ecs :as ecs]
             [basic-combat-ai.components :as comps]
+            [basic-combat-ai.entities :as ents-ns]
             [basic-combat-ai.behavior-tree :as bt]
             [basic-combat-ai.math-utils :as math-utils]
             [basic-combat-ai.tile-map :as tile-map]))
@@ -16,15 +17,18 @@
       (if (empty? q-ents)
         ents
         (let [e (first q-ents)
-              texture-region (:renderable e)
-						x (float (get-in e [:transform :x]))
-						y (float (get-in e [:transform :y]))
-						origin-x (float (get-in e [:transform :origin-x]))
-						origin-y (float (get-in e [:transform :origin-y]))
-						rotation (* -1.0 (float (get-in e [:transform :rotation]))) ;libgdx draws rotation counter clock wise, and um, i want to keep my code clock wise because it  makes more sense to me.
-						  width (float (.getRegionWidth (:renderable e)))
-						height (float (.getRegionHeight (:renderable e)))]
-          (.draw batch texture-region x y origin-x origin-y width height (float 1) (float 1) rotation)
+              texture-region (:texture (:renderable e))
+              x (float (get-in e [:transform :x]))
+              y (float (get-in e [:transform :y]))
+              origin-x (float (get-in e [:transform :origin-x]))
+              origin-y (float (get-in e [:transform :origin-y]))
+              ;libgdx draws rotation counter clock wise, and um, i want to keep my code clock wise because it  makes more sense to me.
+              rotation (* -1.0 (float (get-in e [:transform :rotation]))) 
+              width (float (.getRegionWidth texture-region))
+              height (float (.getRegionHeight texture-region))
+              scale-x (float (:scale-x (:renderable e)))
+              scale-y (float(:scale-y (:renderable e)))]
+          (.draw batch texture-region x y origin-x origin-y width height scale-x scale-y rotation)
           (recur (rest q-ents)))))
     (.end batch))
   ents)
@@ -33,7 +37,7 @@
   (assoc-in entity [:animation :current-frame] cf-num))
 
 (defn- set-renderable [entity frame-num frames]
-  (assoc entity :renderable (:texture (nth frames frame-num))))
+  (comps/renderable entity (:texture (nth frames frame-num))))
 
 (defn- animate* [e delta]
   (if-not (get-in e [:animation :current-animation])
@@ -198,13 +202,69 @@
         modified-ents (map tick-cooldown qualifying-ents)]
     (into rest-ents modified-ents)))
 
+(defn create-pending-entity [{{entities :entities} :ecs :as game}]
+  (loop [idx 0
+         ents entities]
+    (if (= idx (count ents))
+      ents
+      (recur (inc idx)
+             (if-let [create-entity-fn (:pending-entity (nth ents idx))]
+               (assoc ents idx (create-entity-fn game))
+               ents)))))
+
+(defn timed-life [{{entities :entities} :ecs, delta :delta}]
+  (loop [ents entities
+         result-ents []]
+    (if (empty? ents)
+      result-ents
+      (let [e (first ents)
+            timed-life (:timed-life e)]
+        (cond
+          (nil? timed-life)
+            (recur (rest ents) (conj result-ents e))
+          (<= timed-life 0) 
+            (recur (rest ents) result-ents)
+          :else
+            (recur (rest ents) (conj result-ents (assoc e :timed-life (- timed-life delta)))))))))
+
+;(defn run-game [game systems]
+;  (assoc-in game [:ecs :entities] (loop [syss systems
+;                                         ents (get-in game [:ecs :entities])]
+;                                    (if (empty? syss)
+;                                      ents
+;                                      (recur (rest syss) ((first syss) (assoc-in game [:ecs :entities] ents)))))))
+;
+;(defn run-once [] (ms/update-game! #(assoc-in %
+;                                              [:ecs :entities]
+;                                              (get-in (run-game % [tick-behavior-tree
+;                                                                   create-pending-entity
+;                                                                   projectile-weapon-cooldown
+;                                                                   animate
+;                                                                   rotate
+;                                                                   move
+;                                                                   death
+;                                                                   timed-life])
+;                                                      [:ecs :entities]))))
+;
+;(get-in (run-game ms/game [tick-behavior-tree
+;                           create-pending-entity
+;                           projectile-weapon-cooldown
+;                           animate
+;                           rotate
+;                           move
+;                           death
+;                           timed-life])
+;        [:ecs :entities])
+
 (defn init [game]
   (-> game
     (ecs/add-system render)
     (ecs/add-system tick-behavior-tree)
+    (ecs/add-system create-pending-entity)
+    (ecs/add-system projectile-weapon-cooldown)
     (ecs/add-system animate)
     (ecs/add-system rotate)
     (ecs/add-system move)
     (ecs/add-system death)
-    (ecs/add-system projectile-weapon-cooldown)
+    (ecs/add-system timed-life)
     ))

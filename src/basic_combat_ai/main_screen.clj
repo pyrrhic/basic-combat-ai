@@ -9,6 +9,7 @@
             [basic-combat-ai.tile-map :as tile-map]))
 
 (def game {})
+(def game-prev {})
 
 (defn update-game! [func]
   "Expects a function with 1 parameter which will be the game map. The function must return the updated game map."
@@ -45,7 +46,9 @@
      :fire-pistol02 (.findRegion atlas "fire pistol02")
      :pistol-idle (.findRegion atlas "pistol idle")
      :floor (.findRegion atlas "floor")
-     :wall (.findRegion atlas "wall")}))
+     :wall (.findRegion atlas "wall")
+     :tracer (.findRegion atlas "tracer")
+     }))
 
 (defn init-game []
   (let [tex-cache (init-tex-cache)]
@@ -79,7 +82,8 @@
       (.update (:camera game))
       (tile-map/draw-grid (:tile-map game) (:batch game))
       (-> game
-        (ecs/update-ecs)))))
+        (ecs/update-ecs))))
+  )
 
 (defn screen []
   (reify Screen
