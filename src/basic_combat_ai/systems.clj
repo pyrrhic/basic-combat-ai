@@ -108,7 +108,8 @@
                                                              reseted-tree (bt/reset-behavior-tree checked-bt)]
                                                         (bt/tick reseted-tree ent-id (:entities canceled-return-data) (:tile-map canceled-return-data)))
                                    id-canceled (bt/get-id-of-running-composite (:node canceled-tick-data))]
-                               (if (= id-existing id-canceled)
+                               (if (or (= (:status (:node canceled-tick-data)) :failure)
+                                       (= id-existing id-canceled))
                                  (bt/tick checked-bt ent-id ents-m t-map)
                                  canceled-tick-data))
                              ;status is fresh
@@ -227,6 +228,11 @@
           :else
             (recur (rest ents) (conj result-ents (assoc e :timed-life (- timed-life delta)))))))))
 
+;debug toolz
+;(def prev-games [])
+;
+;(require '[basic-combat-ai.main-screen :as ms])
+;
 ;(defn run-game [game systems]
 ;  (assoc-in game [:ecs :entities] (loop [syss systems
 ;                                         ents (get-in game [:ecs :entities])]
@@ -234,17 +240,36 @@
 ;                                      ents
 ;                                      (recur (rest syss) ((first syss) (assoc-in game [:ecs :entities] ents)))))))
 ;
-;(defn run-once [] (ms/update-game! #(assoc-in %
-;                                              [:ecs :entities]
-;                                              (get-in (run-game % [tick-behavior-tree
-;                                                                   create-pending-entity
-;                                                                   projectile-weapon-cooldown
-;                                                                   animate
-;                                                                   rotate
-;                                                                   move
-;                                                                   death
-;                                                                   timed-life])
-;                                                      [:ecs :entities]))))
+;(defn run-once [] 
+;  (do
+;    (if (= 9 (count prev-games)) 
+;      (def prev-games (conj (rest prev-games) ms/game))
+;      (def prev-games (conj prev-games ms/game)))
+;    (ms/update-game! #(assoc-in %
+;                                [:ecs :entities]
+;                                (get-in (run-game % [tick-behavior-tree
+;                                                     create-pending-entity
+;                                                     projectile-weapon-cooldown
+;                                                     animate
+;                                                     rotate
+;                                                     move
+;                                                     death
+;                                                     timed-life])
+;                                        [:ecs :entities])))))
+;
+;(defn run-times [n]
+;  (loop [idx n]
+;    (if (zero? idx)
+;      nil
+;      (do
+;        (run-once)
+;        (recur (dec idx))))))
+;
+;(defn revert-entities [idx]
+;  (if (and (< idx 10) (>= idx 0))
+;    (ms/update-game! #(assoc-in % [:ecs :entities] (:entities (:ecs (nth prev-games idx)))))
+;    "idx must be between 0 and 9, inclusive."))
+
 ;
 ;(get-in (run-game ms/game [tick-behavior-tree
 ;                           create-pending-entity

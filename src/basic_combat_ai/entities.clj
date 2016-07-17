@@ -42,6 +42,6 @@ although you should definately make it grid coords, because putting in world coo
       
 (defn init [game]
   (-> game
-    (ecs/add-entity (pistoleer game 32 32))
+    ;(ecs/add-entity (pistoleer game 32 32))
     (ecs/add-entity (pistoleer game 128 128))
     ))

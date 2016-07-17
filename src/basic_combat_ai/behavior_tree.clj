@@ -73,6 +73,10 @@
       (update :children #(mapv reset-behavior-tree %)))))
 
 (defn tick [node main-ent-id ents tile-map]
+  "returns {:node ;this is the updated root node 
+            :entities ;any entities that were updated. behavior trees are not updated, only 1 tree will be updated
+                      ;and that's the main ent, who's bt is in :node.
+            :tile-map ;the potentially updated tile-map.}"
   (cond
     (= :fresh (:status node)) (run (assoc node :status :running) main-ent-id ents tile-map)
     (= :running (:status node)) (run node main-ent-id ents tile-map)

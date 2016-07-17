@@ -42,7 +42,8 @@
           ents-with-hp (into {} (filter (fn [e] (:hit-points (second e))) entities)) 
           ents-los-checked (map 
                              (fn [e] 
-                                 {:entity e :have-los? (los? main-ent e curr-tile-map)})
+                                 {:entity e 
+                                  :have-los? (los? main-ent e curr-tile-map)})
                              (vals (dissoc ents-with-hp main-ent-id)))
           ents-los-true (filter #(:have-los? %) ents-los-checked)
           closest-ent (loop [e-los (rest ents-los-true)
@@ -143,11 +144,6 @@
                                  curr-tile-map))))))
 
 (defrecord FindPath [status]
-  bt/NodeCancel
-  (bt/cancel [node main-ent-id entities curr-tile-map]
-    (bt/make-return-map (assoc node :status :failure)
-                        (update entities main-ent-id (fn [old-ent] (dissoc old-ent :path)))))
-  
   bt/NodeBehavior
   (bt/reset [node]
     (assoc node :status :fresh))
@@ -167,10 +163,6 @@
         (bt/make-return-map (assoc node :status :failure) main-ent curr-tile-map)))))
 
 (defrecord PickRandomTile [status]
-  bt/NodeCancel
-  (bt/cancel [node main-ent-id entities curr-tile-map]
-    (bt/make-return-map (assoc node :status :failure)
-                        (update entities main-ent-id (fn [old-ent] (dissoc old-ent :move-to)))))
   bt/NodeBehavior
   (bt/reset [node]
        (assoc node :status :fresh))
@@ -179,41 +171,55 @@
           y-max 8
           x (rand-int x-max)
           y (rand-int y-max)]
-      (bt/make-return-map (assoc node :status :success) 
-                          (assoc-in entities [main-ent-id :move-to] (comps/move-to x y)) 
-                          curr-tile-map))))
+      (if (:passable (tile-map/get-tile x y curr-tile-map))
+        (bt/make-return-map (assoc node :status :success) 
+                            (assoc-in entities [main-ent-id :move-to] (comps/move-to x y)) 
+                            curr-tile-map)
+        (bt/make-return-map (assoc node :status :failure)
+                            entities
+                            curr-tile-map)))))
+  
 
 (defrecord FollowPath [status]
-     bt/NodeBehavior
-     (bt/reset [node] 
-       (assoc node :status :fresh))
-     (bt/run [node main-ent-id entities curr-tile-map]
-       (let [main-ent (main-ent-id entities)
-             curr-path-idx (get-in main-ent [:path :curr-path-idx])
-             curr-path (get-in main-ent [:path :a-path])
-             target-node (nth curr-path curr-path-idx nil)]
-         (if (nil? target-node)
-           (bt/make-return-map (assoc node :status :success) (assoc entities main-ent-id (dissoc main-ent :path)) curr-tile-map)
-           (if (and 
-                 (== (:grid-x target-node) (tile-map/world-coord->grid (:x (:transform main-ent))))
-                 (== (:grid-y target-node) (tile-map/world-coord->grid (:y (:transform main-ent)))))
-             ;this means we spend an AI tick just incrementing the curr path idx. ehh... didn't intend for this.
-             (bt/make-return-map node (update-in entities [main-ent-id :path :curr-path-idx] #(inc %)) curr-tile-map)
-             (let [ent-target-angle (math-utils/round-to-decimal (math-utils/angle-of [(:x (:transform main-ent)) (:y (:transform main-ent))] 
-                                                                                      [(tile-map/grid->world-coord (:grid-x target-node)) (tile-map/grid->world-coord (:grid-y target-node))]) 1)]
-               (if (== ent-target-angle (:rotation (:transform main-ent)))
-                 ;walk towards it
-                 (if (:target-location main-ent)
-                   (bt/make-return-map node entities curr-tile-map)
-                   (bt/make-return-map node
-                                       (assoc-in entities [main-ent-id :target-location] {:x (:grid-x target-node), :y (:grid-y target-node)})
-                                       curr-tile-map))
-                 ;rotate towards it
-                 (if (:target-rotation main-ent)
-                   (bt/make-return-map node entities curr-tile-map)
-                   (bt/make-return-map node
-                                       (assoc-in entities [main-ent-id :target-rotation] ent-target-angle)
-                                       curr-tile-map)))))))))
+  bt/NodeCancel
+  (bt/cancel [node main-ent-id entities curr-tile-map]
+    (bt/make-return-map (assoc node :status :failure)
+                        (update entities main-ent-id (fn [old-ent] (dissoc old-ent 
+                                                                           :path
+                                                                           :target-location
+                                                                           :target-rotation)))
+                        curr-tile-map))
+  bt/NodeBehavior
+  (bt/reset [node] 
+    (assoc node :status :fresh))
+  (bt/run [node main-ent-id entities curr-tile-map]
+    (let [main-ent (main-ent-id entities)
+          curr-path-idx (get-in main-ent [:path :curr-path-idx])
+          curr-path (get-in main-ent [:path :a-path])
+          target-node (nth curr-path curr-path-idx nil)]
+      (if (nil? target-node)
+        (bt/make-return-map (assoc node :status :success) (assoc entities main-ent-id (dissoc main-ent :path)) curr-tile-map)
+        (if (and 
+              (== (:grid-x target-node) (tile-map/world-coord->grid (:x (:transform main-ent))))
+              (== (:grid-y target-node) (tile-map/world-coord->grid (:y (:transform main-ent)))))
+          ;this means we spend an AI tick just incrementing the curr path idx. ehh... didn't intend for this.
+          (bt/make-return-map node (update-in entities [main-ent-id :path :curr-path-idx] #(inc %)) curr-tile-map)
+          (let [ent-target-angle (math-utils/round-to-decimal 
+                                   (math-utils/angle-of [(:x (:transform main-ent)) (:y (:transform main-ent))] 
+                                                        [(tile-map/grid->world-coord (:grid-x target-node)) (tile-map/grid->world-coord (:grid-y target-node))]) 1)]
+            (if (== ent-target-angle (:rotation (:transform main-ent)))
+              ;walk towards it
+              (if (:target-location main-ent)
+                (bt/make-return-map node entities curr-tile-map)
+                (bt/make-return-map node
+                                    (assoc-in entities [main-ent-id :target-location] {:x (:grid-x target-node), :y (:grid-y target-node)})
+                                    curr-tile-map))
+              ;rotate towards it
+              (if (:target-rotation main-ent)
+                (bt/make-return-map node entities curr-tile-map)
+                (bt/make-return-map node
+                                    (assoc-in entities [main-ent-id :target-rotation] ent-target-angle)
+                                    curr-tile-map)))))))))
 
 (defn- ents-in-fov [main-ent ents]
   (let [main-e-collider (:fov-collider main-ent)

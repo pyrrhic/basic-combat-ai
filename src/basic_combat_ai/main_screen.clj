@@ -50,6 +50,21 @@
      :tracer (.findRegion atlas "tracer")
      }))
 
+(defn add-wall* [x y]
+  (let [tile (nth (nth (:tile-map game) x) y)]
+    (assoc tile
+           :passable false
+           :texture (:wall (:tex-cache game)))))
+
+(defn add-wall [x y] 
+  (update-game! #(assoc-in % [:tile-map x y] (add-wall* x y))))
+
+(defn pause []
+  (update-game! #(assoc % :paused true)))
+
+(defn resume []
+  (update-game! #(assoc % :paused false)))
+
 (defn init-game []
   (let [tex-cache (init-tex-cache)]
     (-> {:batch (SpriteBatch.)
@@ -77,7 +92,7 @@
         (println "frame rate is dropping below 60 : " last-fps " @ " (new java.util.Date)))))
   
   (if (:paused game)
-    game
+    (assoc-in game [:ecs :entities] (sys/render game))
     (do (clear-screen)
       (.update (:camera game))
       (tile-map/draw-grid (:tile-map game) (:batch game))

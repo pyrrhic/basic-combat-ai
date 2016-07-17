@@ -13,5 +13,5 @@
   (-> {}
     (assoc :id id)
     (comps/renderable (:tracer tex-cache) scale-x scale-y)
-    (comps/timed-life 0.05)
+    (comps/timed-life 0.01)
     (assoc :transform (comps/transform x y rotation 0 0))))
