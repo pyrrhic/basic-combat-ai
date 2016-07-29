@@ -3,44 +3,121 @@ s.png
 format: RGBA8888
 filter: Nearest,Nearest
 repeat: none
-fire pistol00
+fire pistol00 orange
   rotate: false
   xy: 1, 44
   size: 32, 64
   orig: 32, 64
   offset: 0, 0
   index: -1
-fire pistol01
+fire pistol00
   rotate: false
   xy: 35, 44
   size: 32, 64
   orig: 32, 64
   offset: 0, 0
   index: -1
-fire pistol02
+fire pistol01 orange
   rotate: false
   xy: 69, 44
   size: 32, 64
   orig: 32, 64
   offset: 0, 0
   index: -1
-pistol idle
+fire pistol01
   rotate: false
   xy: 103, 44
   size: 32, 64
   orig: 32, 64
   offset: 0, 0
   index: -1
-floor
+fire pistol02 orange
+  rotate: false
+  xy: 137, 44
+  size: 32, 64
+  orig: 32, 64
+  offset: 0, 0
+  index: -1
+fire pistol02
+  rotate: false
+  xy: 171, 44
+  size: 32, 64
+  orig: 32, 64
+  offset: 0, 0
+  index: -1
+pistol idle orange
+  rotate: false
+  xy: 205, 44
+  size: 32, 64
+  orig: 32, 64
+  offset: 0, 0
+  index: -1
+pistol idle
+  rotate: false
+  xy: 239, 44
+  size: 32, 64
+  orig: 32, 64
+  offset: 0, 0
+  index: -1
+cover
   rotate: false
   xy: 1, 10
   size: 32, 32
   orig: 32, 32
   offset: 0, 0
   index: -1
+floor
+  rotate: false
+  xy: 273, 76
+  size: 32, 32
+  orig: 32, 32
+  offset: 0, 0
+  index: -1
+monster attack 00
+  rotate: false
+  xy: 35, 10
+  size: 32, 32
+  orig: 32, 32
+  offset: 0, 0
+  index: -1
+monster attack 01
+  rotate: false
+  xy: 307, 76
+  size: 32, 32
+  orig: 32, 32
+  offset: 0, 0
+  index: -1
+monster attack 02
+  rotate: false
+  xy: 69, 10
+  size: 32, 32
+  orig: 32, 32
+  offset: 0, 0
+  index: -1
+monster idle
+  rotate: false
+  xy: 341, 76
+  size: 32, 32
+  orig: 32, 32
+  offset: 0, 0
+  index: -1
+monster walk 00
+  rotate: false
+  xy: 103, 10
+  size: 32, 32
+  orig: 32, 32
+  offset: 0, 0
+  index: -1
+monster walk 01
+  rotate: false
+  xy: 375, 76
+  size: 32, 32
+  orig: 32, 32
+  offset: 0, 0
+  index: -1
 wall
   rotate: false
-  xy: 137, 76
+  xy: 137, 10
   size: 32, 32
   orig: 32, 32
   offset: 0, 0

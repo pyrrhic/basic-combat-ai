@@ -124,6 +124,7 @@
                            updated-child-map)))))
 
 (defrecord Sequence [status curr-child-idx children]
+  ;works like logical AND
   NodeBehavior
   (reset [node]
     (assoc node 
@@ -151,7 +152,16 @@
 	    (if child-successful-and-not-last?
 	      (tick-updated-selector)
 	      selector-with-last-updated-child))))
-                              
+
+;(defrecord LoopUntil [status curr-child-idx children]
+;  NodeBehavior
+;  (reset [node]
+;    (assoc node 
+;           :status :fresh
+;           :curr-child-idx 0))
+;  (run [node main-ent-id entities tile-map]
+;    (every #(= :success (:status %)) children)
+
 (defrecord TestLeaf [status work-counter]
   NodeCancel 
   (cancel [node main-ent-id entities tile-map]

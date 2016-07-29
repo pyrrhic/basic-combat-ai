@@ -26,6 +26,7 @@
     (touchDown [this x y pointer button] false)
     (keyDown [this keycode] 
       (alter-var-root (var game) #(assoc-in % [:inputs (keyword (Input$Keys/toString keycode))] true))
+      (println (:inputs game))
       true)
     (keyUp [this keycode] 
       (alter-var-root (var game) #(assoc-in % [:inputs (keyword (Input$Keys/toString keycode))] false))
@@ -45,11 +46,23 @@
      :fire-pistol01 (.findRegion atlas "fire pistol01")
      :fire-pistol02 (.findRegion atlas "fire pistol02")
      :pistol-idle (.findRegion atlas "pistol idle")
+     :fire-pistol00-orange (.findRegion atlas "fire pistol00 orange")
+     :fire-pistol01-orange (.findRegion atlas "fire pistol01 orange")
+     :fire-pistol02-orange (.findRegion atlas "fire pistol02 orange")
+     :pistol-idle-orange (.findRegion atlas "pistol idle orange")
      :floor (.findRegion atlas "floor")
      :wall (.findRegion atlas "wall")
      :tracer (.findRegion atlas "tracer")
+     :cover (.findRegion atlas "cover")
+     :monster-idle (.findRegion atlas "monster idle")
+     :monster-walk00 (.findRegion atlas "monster walk 00")
+     :monster-walk01 (.findRegion atlas "monster walk 01")
+     :monster-attack-00 (.findRegion atlas "monster attack 00")
+     :monster-attack-01 (.findRegion atlas "monster attack 01")
+     :monster-attack-02 (.findRegion atlas "monster attack 02")
      }))
 
+;tile stuff
 (defn add-wall* [x y]
   (let [tile (nth (nth (:tile-map game) x) y)]
     (assoc tile
@@ -58,6 +71,7 @@
 
 (defn add-wall [x y] 
   (update-game! #(assoc-in % [:tile-map x y] (add-wall* x y))))
+;;;
 
 (defn pause []
   (update-game! #(assoc % :paused true)))
@@ -68,13 +82,25 @@
 (defn init-game []
   (let [tex-cache (init-tex-cache)]
     (-> {:batch (SpriteBatch.)
-         :camera (OrthographicCamera. 800 600)
+         :camera (OrthographicCamera. (.getWidth Gdx/graphics) (.getHeight Gdx/graphics))
          :tex-cache tex-cache
          :inputs {}
-         :tile-map (tile-map/create-grid 25 19 tex-cache)}
+         :tile-map (tile-map/create-grid 10 19 tex-cache)}
       (ecs/init)
       (ent/init)
       (sys/init))))
+
+(defn move-camera [{inputs :inputs, cam :camera}]
+  (do
+    (when (:Right inputs)
+      (.translate cam 1 0))
+    (when (:Left inputs)
+      (.translate cam -1 0))
+    (when (:Up inputs)
+      (.translate cam 0 1))
+    (when (:Down inputs)
+      (.translate cam 0 -1))
+    ))
 
 (def last-fps 0)
 (def fps 0)
@@ -93,7 +119,9 @@
   
   (if (:paused game)
     (assoc-in game [:ecs :entities] (sys/render game))
-    (do (clear-screen)
+    (do 
+      (clear-screen)
+      (move-camera game)
       (.update (:camera game))
       (tile-map/draw-grid (:tile-map game) (:batch game))
       (-> game
@@ -116,5 +144,6 @@
     (dispose[this])
     (hide [this])
     (pause [this])
-    (resize [this w h])
+    (resize [this w h]
+      (.setToOrtho (:camera game) false (.getWidth Gdx/graphics) (.getHeight Gdx/graphics)))
     (resume [this])))

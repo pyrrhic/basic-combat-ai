@@ -66,6 +66,7 @@
 	      (if (get-in e [:animation :frames current-animation :loop?])
 		      (-> e 
 		        (set-current-frame-num 0)
+            (set-renderable 0 current-frames)
 		        (assoc-in [:animation :current-duration] (:duration (first current-frames))))
 		      (-> e
 		        (assoc-in [:animation :current-animation] nil)
@@ -181,24 +182,26 @@
 
 (defn death [{{ents :entities} :ecs}]
   (let [[qualifying-ents rest-ents] (filter-ents ents #(:hit-points %))
-        die? (fn [e]
-               (if (<= (:hit-points e) 0)
-                 true
-                 false))]
-    (loop [q-ents qualifying-ents
-           ents-map (ent-vec->map ents)]
-      (if (empty? q-ents)
-        (into rest-ents (vals ents-map))
-        (recur 
-          (rest q-ents)
-          (let [e (first q-ents)]
-            (if (die? e) (dissoc ents-map (keyword (str (:id e)))) ents-map)))))))
+        nil-if-dead (fn [e] (if (<= (:hit-points e) 0) nil e))
+        remove-nils (fn [ents] (filter #(not (nil? %)) ents))]
+    (-> (map nil-if-dead qualifying-ents)
+      (remove-nils)
+      (into rest-ents))))
 
 (defn projectile-weapon-cooldown [{{ents :entities} :ecs delta :delta}]
   (let [[qualifying-ents rest-ents] (filter-ents ents #(:projectile-weapon %))
         tick-cooldown (fn [e]
                         (if (pos? (:curr-cooldown (:projectile-weapon e)))
                           (update-in e [:projectile-weapon :curr-cooldown] (fn [ccd] (math-utils/round-to-decimal (- ccd delta) 3)))
+                          e))
+        modified-ents (map tick-cooldown qualifying-ents)]
+    (into rest-ents modified-ents)))
+
+(defn melee-weapon-cooldown [{{ents :entities} :ecs delta :delta}]
+  (let [[qualifying-ents rest-ents] (filter-ents ents #(:melee-weapon %))
+        tick-cooldown (fn [e]
+                        (if (pos? (:curr-cooldown (:melee-weapon e)))
+                          (update-in e [:melee-weapon :curr-cooldown] (fn [ccd] (math-utils/round-to-decimal (- ccd delta) 3)))
                           e))
         modified-ents (map tick-cooldown qualifying-ents)]
     (into rest-ents modified-ents)))
@@ -228,11 +231,44 @@
           :else
             (recur (rest ents) (conj result-ents (assoc e :timed-life (- timed-life delta)))))))))
 
+(defn cover [{{entities :entities} :ecs tile-map :tile-map}]
+ ;remove in-cover
+ ;check if any entities with hp share a tile-grid with current sandbag, other than the sandbag itself.
+ ;if one does, give it in-cover with appropriate miss chance.
+ (let [removed-in-cover (mapv (fn [e] (dissoc e :chance-to-miss)) entities)
+       [cover-ents rest-ents] (filter-ents removed-in-cover #(:provides-chance-to-miss %))
+       in-same-tile? (fn [e1 e2]
+                       (let [e1-transform (:transform e1)
+                             e1-tile-loc {:x (tile-map/world-coord->grid (:x e1-transform)), :y (tile-map/world-coord->grid (:y e1-transform))}
+                             e2-transform (:transform e2)
+                             e2-tile-loc {:x (tile-map/world-coord->grid (:x e2-transform)), :y (tile-map/world-coord->grid (:y e2-transform))}]
+                         (= e1-tile-loc e2-tile-loc)))
+       ents-cover (fn [e cover-spots]
+                    "return the entity's cover spot, if it doesnt have one then return nil."
+                    (loop [c-spots cover-spots]
+                      (if (empty? c-spots)
+                        nil
+                        (let [cs (first c-spots)]
+                          (if (in-same-tile? e cs)
+                            cs
+                            (recur (rest c-spots)))))))
+       applicable-ents-have-cover (loop [ents rest-ents
+                                         updated []]
+                                    (if (empty? ents)
+                                      updated
+                                      (let [e (first ents)]
+                                        (if-let [e-cover (ents-cover e cover-ents)]
+                                          (recur (rest ents)
+                                                 (conj updated (comps/chance-to-miss e (:provides-chance-to-miss e-cover))))
+                                          (recur (rest ents)
+                                                 (conj updated e))))))]
+   (into cover-ents applicable-ents-have-cover)))
+
 ;debug toolz
-;(def prev-games [])
+;
 ;
 ;(require '[basic-combat-ai.main-screen :as ms])
-;
+;(def prev-games [])
 ;(defn run-game [game systems]
 ;  (assoc-in game [:ecs :entities] (loop [syss systems
 ;                                         ents (get-in game [:ecs :entities])]
@@ -287,9 +323,11 @@
     (ecs/add-system tick-behavior-tree)
     (ecs/add-system create-pending-entity)
     (ecs/add-system projectile-weapon-cooldown)
+    (ecs/add-system melee-weapon-cooldown)
     (ecs/add-system animate)
     (ecs/add-system rotate)
     (ecs/add-system move)
     (ecs/add-system death)
     (ecs/add-system timed-life)
+    (ecs/add-system cover)
     ))

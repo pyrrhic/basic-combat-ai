@@ -53,9 +53,10 @@
 (defn behavior-tree [root-node]
   {:tree root-node})
 
-(defn move-to [x-tile y-tile]
-  {:x x-tile
-   :y y-tile})
+(defn move-to [ent x-tile y-tile]
+  (assoc ent
+         :move-to {:x x-tile
+                   :y y-tile}))
 
 (defn path [path]
   {:a-path path
@@ -71,6 +72,12 @@
 (defn hit-points [ent hp]
   (assoc ent :hit-points hp)) 
 
+(defn melee-weapon [ent & {:keys [cooldown curr-cooldown damage]}]
+  (assoc ent 
+         :melee-weapon {:cooldown cooldown
+                        :curr-cooldown curr-cooldown
+                        :damage damage}))
+  
 (defn projectile-weapon [ent & {:keys [cooldown curr-cooldown damage max-ammo current-ammo reload-speed]}]
      (assoc ent
             :projectile-weapon {:cooldown cooldown
@@ -93,6 +100,14 @@
   (assoc ent
          :timed-life life-in-seconds))
   
+(defn team [ent name]
+  (assoc ent :team name))
+
+(defn provides-chance-to-miss [ent chance-to-miss]
+  (assoc ent :provides-chance-to-miss chance-to-miss))
+
+(defn chance-to-miss [ent chance-to-miss]
+  (assoc ent :chance-to-miss chance-to-miss)) 
  
   
   
