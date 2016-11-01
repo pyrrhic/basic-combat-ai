@@ -6,11 +6,6 @@ Learned about and implemented behavior tree's, except mine is not visual. So, it
 
 Read a ton about entity component systems and made a very basic one. The ecs datastructure just holds a list of entities (maps) and systems (functions). Each time the ecs is updated, the system functions are executed sequentially. Each system takes all the entities, works on the ones it cares about, then returns the updated list of entities. That updated list is then passed on to the next system, and so on.
 
-
-## Usage
-
-FIXME
-
 ## License
 
 Copyright © 2016 FIXME
